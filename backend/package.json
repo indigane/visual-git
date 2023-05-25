@@ -2,6 +2,7 @@
   "name": "visual-git",
   "version": "1.0.0",
   "description": "Visual Git",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
