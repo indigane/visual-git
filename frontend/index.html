@@ -4,22 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Visual Git</title>
-    <style>
-      .result {
-        white-space: pre;
-      }
-    </style>
+    <link href="css/style.css" rel="stylesheet">
   </head>
   <body>
     <div class="result"></div>
-    <script type="module">
-      const commandArguments = ['log', '--all', '--oneline', '--reflog'];
-      const response = await fetch('http://localhost:3000', {
-        method: 'POST',
-        body: JSON.stringify(commandArguments),
-      });
-      const result = await response.text();
-      document.querySelector('.result').insertAdjacentText('beforeend', result);
-    </script>
+    <script src="js/main.js" type="module"></script>
   </body>
 </html>

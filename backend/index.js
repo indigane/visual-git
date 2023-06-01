@@ -2,10 +2,57 @@
 //
 // Server
 //
-import http from 'http';
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const STATIC_PATH = '../frontend/';
+
+const extensionToMimeType = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.css': 'text/css',
+};
+
+const isValidPath = (() => {
+  const containsDisallowedCharacters = /[^a-z0-9._/-]/i;
+  const nonAlphanumericCharacterBeforeDot = /[^a-z0-9]\./i;
+  const nonAlphanumericCharacterAfterDot = /\.[^a-z0-9]/i;
+  return function isValidPath(inputPath) {
+    inputPath = path.normalize(inputPath);
+    if (containsDisallowedCharacters.test(inputPath)) {
+      return false;
+    }
+    if (nonAlphanumericCharacterBeforeDot.test(inputPath)) {
+      return false;
+    }
+    if (nonAlphanumericCharacterAfterDot.test(inputPath)) {
+      return false;
+    }
+    return true;
+  }
+})();
 
 const server = http.createServer((req, res) => {
-  if (req.method === 'POST' && req.url === '/') {
+  if (req.method === 'GET') {
+    // Serve static files
+    const filePath = req.url === '/' ? 'index.html' : req.url;
+    if ( ! isValidPath(filePath)) {
+      res.statusCode = 404;
+      res.end();
+    }
+    const mimeType = extensionToMimeType[path.extname(filePath)] ?? 'application/octet-stream';
+    fs.readFile(path.join(STATIC_PATH, filePath), (err, data) => {
+      if (err) {
+        res.statusCode = 404;
+        res.end();
+      } else {
+        res.writeHead(200, {'Content-Type': mimeType});
+        res.end(data);
+      }
+    });
+  } else if (req.method === 'POST' && req.url === '/') {
+    // Handle commands
     let body = '';
     req.on('data', chunk => {
       body += chunk.toString();
@@ -29,7 +76,7 @@ server.listen(3000, () => {
 //
 // Command handling
 //
-import { spawn } from 'child_process';
+import { spawn } from 'node:child_process';
 
 // TODO: Better validation?
 const commandAllowList = [
