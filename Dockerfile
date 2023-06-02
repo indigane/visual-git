@@ -5,7 +5,9 @@ USER root
 
 # Update and install dependencies in a single layer
 RUN apt-get update && \
-    apt-get install -y sudo curl git build-essential nodejs npm && \
+    apt-get install -y sudo curl git build-essential && \
+    curl -sL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
 
