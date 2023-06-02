@@ -1,33 +1,20 @@
 # Start from the official Ubuntu image
 FROM ubuntu:latest
 
-# Install curl, git, and other dependencies
-RUN apt update && \
-    apt install -y curl git build-essential
+USER root
 
-# Install Node.js
-RUN curl -sL https://deb.nodesource.com/setup_20.x | bash -
-RUN apt install -y nodejs
+# Update and install dependencies in a single layer
+RUN apt-get update && \
+    apt-get install -y sudo curl git build-essential nodejs npm && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
-# Verify Node.js and npm were installed correctly
-RUN node -v
-RUN npm -v
+# Create a non-root user 'user' with sudo privileges
+RUN useradd --create-home --uid 1000 --shell /bin/bash user && \
+    usermod --append --groups sudo user
+
+# Switch to the just created user
+USER user
 
 # Create app directory
-WORKDIR /app
-
-# Copy package.json and package-lock.json
-COPY package*.json ./
-
-# Install app dependencies
-RUN npm install
-
-# If you are building your code for production
-# RUN npm ci --only=production
-
-# Bundle app source
-COPY . .
-
-# Your app binds to port 3000 so you'll use the EXPOSE instruction to have it mapped by the docker daemon
-EXPOSE 3000
-
+WORKDIR /home/user/app
