@@ -93,7 +93,7 @@ async function handleCommand(commandArguments) {
       git.stdout.on('data', (data) => {
         result += data;
       });
-      git.stdout.on('close', (exitCode) => {
+      git.on('close', (exitCode) => {
         console.log(`git exited with code ${exitCode}`);
         resolve(result);
       });
