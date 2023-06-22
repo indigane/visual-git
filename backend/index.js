@@ -81,6 +81,7 @@ import { spawn } from 'node:child_process';
 // TODO: Better validation?
 const commandAllowList = [
   `["log","--all","--oneline","--reflog"]`,
+  `["log","--all","--pretty=raw"]`,
 ];
 
 async function handleCommand(commandArguments) {
