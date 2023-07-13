@@ -1,8 +1,28 @@
 import * as git from './git-commands.js';
+import { asTextContent, requestIdlePromise } from './utils.js';
 
 
+async function renderCommits(commits) {
+  const batchSize = 2;
+  for (const [index, commit] of commits.entries()) {
+    const isBatchSizeReached = index !== 0 && index % batchSize === 0;
+    if (isBatchSizeReached) {
+      await requestIdlePromise(100);
+    }
+    document.body.insertAdjacentHTML('beforeend', `
+    <div class="commit">
+      <div class="message">${asTextContent(commit.subject)}</div>
+    </div>
+    `);
+  }
+}
 
-console.log(await git.log());
+async function woop() {
+  const commits = await git.log('--date-order');
+  renderCommits(commits);
+}
+
+woop();
 
 /*
 const bar = new Commit({

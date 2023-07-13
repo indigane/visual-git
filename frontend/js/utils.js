@@ -9,3 +9,17 @@ export const dataclass = baseClass => {
     }
   };
 };
+
+
+export function requestIdlePromise(timeout = null) {
+  return new Promise((resolve, _reject) => {
+    requestIdleCallback(resolve, {timeout});
+  });
+}
+
+
+export function asTextContent(input) {
+  const tempElement = document.createElement('span');
+  tempElement.textContent = input;
+  return tempElement.innerHTML;
+}

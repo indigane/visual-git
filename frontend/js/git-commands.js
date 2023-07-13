@@ -10,7 +10,7 @@ export async function executeGitCommand(args) {
   return commandOutput;
 }
 
-export async function log() {
+export async function log(...args) {
   // Indent by 1 space using %w line wrap format.
   // Indenting ensures that newlines in the user content can not break the parsing.
   // 0 = no wrap, only indent.
@@ -53,7 +53,7 @@ export async function log() {
     '%n%n',
   ].join('');
 
-  const commandArguments = ['log', '--decorate=full', `--format=${formatString}`];
+  const commandArguments = ['log', '--decorate=full', `--format=${formatString}`, ...args];
   const commandOutput = await executeGitCommand(commandArguments);
   const commits = parseLogCustomFormat(commandOutput);
   return commits;
