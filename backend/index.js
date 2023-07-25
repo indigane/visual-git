@@ -85,24 +85,53 @@ const commandAllowList = [
   `["log","--decorate=full","--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %G?%n%n%w(0,0,1) %s%w(0,0,0)%n%n%w(0,0,1) %b%w(0,0,0)%n%n%w(0,0,1) %N%w(0,0,0)%n%n"]`,
   `["log","--decorate=full","--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %G?%n%n%w(0,0,1) %s%w(0,0,0)%n%n%w(0,0,1) %b%w(0,0,0)%n%n%w(0,0,1) %N%w(0,0,0)%n%n","--date-order"]`,
 ];
+// TODO: Where do we get repository path from? For now it is a command line argument, or current directory.
+let repositoryPath;
+if (process.argv[2]) {
+  repositoryPath = path.join(process.argv[2], '.git');
+}
+else {
+  // Ask git for --git-dir. This is mostly an example, as we could also omit --git-dir in this case.
+  repositoryPath = (await runCommand('git', ['rev-parse', '--absolute-git-dir'])).trim();
+}
 
-async function handleCommand(commandArguments) {
+function handleCommand(commandArguments) {
   return new Promise((resolve, reject) => {
     // TODO: Do we need CSRF checks?
     if (commandAllowList.includes(commandArguments)) {
       commandArguments = JSON.parse(commandArguments);
-      const git = spawn('git', commandArguments);
-      let result = '';
-      git.stdout.on('data', (data) => {
-        result += data;
-      });
-      git.on('close', (exitCode) => {
-        console.log(`git exited with code ${exitCode}`);
-        resolve(result);
+      // Repository path can contain spaces, child_process.spawn does not care.
+      runCommand('git', [`--git-dir=${repositoryPath}`, ...commandArguments])
+      .then(result => resolve(result))
+      .catch(error => {
+        console.log(error);
+        reject('git-error');
       });
     } else {
       console.log('Unknown command: ' + commandArguments);
       reject('unknown-command');
     }
+  });
+}
+
+function runCommand(executable, args) {
+  return new Promise((resolve, reject) => {
+    const command = spawn(executable, args);
+    let result = '';
+    let errorResult = '';
+    command.stdout.on('data', (data) => {
+      result += data;
+    });
+    command.stderr.on('data', (data) => {
+      errorResult += data;
+    });
+    command.on('close', (exitCode) => {
+      if (exitCode === 0) {
+        resolve(result);
+      }
+      else {
+        reject(errorResult);
+      }
+    });
   });
 }

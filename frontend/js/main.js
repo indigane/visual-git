@@ -3,7 +3,8 @@ import { asTextContent, requestIdlePromise } from './utils.js';
 
 
 async function renderCommits(commits) {
-  const batchSize = 2;
+  const latestCommitsByIndentLevel = [];
+  const batchSize = 100;
   for (const [index, commit] of commits.entries()) {
     const isBatchSizeReached = index !== 0 && index % batchSize === 0;
     if (isBatchSizeReached) {
