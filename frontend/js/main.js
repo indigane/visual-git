@@ -4,19 +4,33 @@ import { asTextContent, requestIdlePromise } from './utils.js';
 
 
 async function renderCommits(commits) {
+  const commitsContainer = document.querySelector('.commits');
   const latestCommitsByIndentLevel = [];
-  const batchSize = 100;
-  for (const [index, commit] of commits.entries()) {
+  const maxCommits = 50000;
+  const batchSize = 1000;
+  for (const [index, commit] of commits.slice(0, maxCommits).entries()) {
     const isBatchSizeReached = index !== 0 && index % batchSize === 0;
     if (isBatchSizeReached) {
+      updateMaxIndent();
       await requestIdlePromise(100);
     }
     const indentLevel = updateIndentLevels(commit);
-    document.body.insertAdjacentHTML('beforeend', `
-    <div class="commit" style="--indent-level: ${indentLevel};">
+    commitsContainer.insertAdjacentHTML('beforeend', `
+    <div class="commit" style="--index: ${index}; --indent-level: ${indentLevel};" data-id="${commit.id}">
+      <div class="graph">
+        <svg>
+          <circle>
+        </svg>
+      </div>
       <div class="message">${asTextContent(commit.subject)}</div>
     </div>
-    `);
+    `.trim());
+  }
+  updateMaxIndent();
+
+  function updateMaxIndent() {
+    const maxIndent = latestCommitsByIndentLevel.length;
+    commitsContainer.style.setProperty('--max-indent', maxIndent);
   }
 
   function updateIndentLevels(commit) {
@@ -32,7 +46,7 @@ async function renderCommits(commits) {
         }
         continue;
       }
-      const positionInParents = latestCommit.parents.indexOf(commit.id);
+      const positionInParents = latestCommit.parents?.indexOf(commit.id) ?? -1;
       const isPrimaryParent = positionInParents === 0;
       //const isSecondaryParent = positionInParents >= 1;
       // We will render the commit in the first indent level where the commit is the primary parent.
@@ -59,7 +73,7 @@ async function renderCommits(commits) {
 }
 
 async function woop() {
-  const commits = await git.log('--date-order');
+  const commits = await git.log('--date-order', '--max-count=50000');
   renderCommits(commits);
 }
 

@@ -1,8 +1,34 @@
-.result {
-  white-space: pre;
+.commits {
+  --max-indent: 1;
 }
 .commit {
+  --index: 0;
   --indent-level: 0;
-  --indent-size: 1em;
-  margin-left: calc(var(--indent-size) * var(--indent-level));
+  --indent-size: 2em;
+  --row-height: 2em;
+  contain: size layout style;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: var(--row-height);
+}
+.commit .graph {
+  --max-graph-width: 50vw;
+  --graph-width: min(calc(var(--indent-size) * var(--max-indent)), var(--max-graph-width));
+  width: var(--graph-width);
+  min-width: var(--graph-width);
+  height: var(--row-height);
+}
+.commit .graph svg {
+  --size: var(--row-height);
+  --offset-left: calc(var(--indent-size) * var(--indent-level));
+  width: 100vw;
+  height: 100vh;
+  contain: strict;
+}
+.commit .graph circle {
+  fill: currentColor;
+  cx: calc(var(--size) / 2 + var(--offset-left));
+  cy: calc(var(--size) / 2);
+  r: calc(var(--size) / 8);
 }

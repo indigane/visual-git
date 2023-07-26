@@ -35,7 +35,7 @@ export async function log(...args) {
     // Indirect fields
     '%D', // ref names separated by `, `
     '%S', // ref name by which the commit was reached (--source)
-    '%G?', // signature validation status (optional, slow)
+    '', //'%G?', // signature validation status (optional, slow)
   ].join(
     // Indent all lines by one space to prevent empty fields from breaking split by \n\n\n and \n\n
     '%n' + ' '
