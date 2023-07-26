@@ -82,8 +82,8 @@ import { spawn } from 'node:child_process';
 const commandAllowList = [
   `["log","--all","--oneline","--reflog"]`,
   `["log","--all","--pretty=raw"]`,
-  `["log","--decorate=full","--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %G?%n%n%w(0,0,1) %s%w(0,0,0)%n%n%w(0,0,1) %b%w(0,0,0)%n%n%w(0,0,1) %N%w(0,0,0)%n%n"]`,
-  `["log","--decorate=full","--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %G?%n%n%w(0,0,1) %s%w(0,0,0)%n%n%w(0,0,1) %b%w(0,0,0)%n%n%w(0,0,1) %N%w(0,0,0)%n%n","--date-order"]`,
+  `["log","--decorate=full","--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %G?%n%n%w(0,0,1) %s %w(0,0,0)%n%n%w(0,0,1) %b %w(0,0,0)%n%n%w(0,0,1) %N %w(0,0,0)%n%n"]`,
+  `["log","--decorate=full","--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %G?%n%n%w(0,0,1) %s %w(0,0,0)%n%n%w(0,0,1) %b %w(0,0,0)%n%n%w(0,0,1) %N %w(0,0,0)%n%n","--date-order"]`,
 ];
 // TODO: Where do we get repository path from? For now it is a command line argument, or current directory.
 let repositoryPath;

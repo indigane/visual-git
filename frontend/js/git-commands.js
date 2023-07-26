@@ -42,14 +42,16 @@ export async function log(...args) {
   );
 
   const formatString = [
+    // Use indent for multi-line content, so that newlines do not break the parsing.
+    // An extra space is added before turning off the indent format, because empty last lines are not indented.
     singleLineFields,
     '%n%n',
-    indentOn + '%s' + indentOff, // indented subject
+    indentOn + '%s' + ' ' + indentOff, // indented subject
     '%n%n',
-    indentOn + '%b' + indentOff, // indented body
+    indentOn + '%b' + ' ' + indentOff, // indented body
     '%n%n',
     // Indirect content, stored as separate blobs
-    indentOn + '%N' + indentOff, // indented notes (optional)
+    indentOn + '%N' + ' ' + indentOff, // indented notes (optional)
     '%n%n',
   ].join('');
 
