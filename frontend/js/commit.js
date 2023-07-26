@@ -13,3 +13,5 @@ export const Commit = dataclass(class {
   messageBody;
   notes;
 });
+
+export const EMPTY_INDENT_LEVEL = Symbol.for('EMPTY_INDENT_LEVEL');
