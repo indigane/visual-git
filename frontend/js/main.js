@@ -73,7 +73,8 @@ async function renderCommits(commits) {
 }
 
 async function woop() {
-  const commits = await git.log('--date-order', '--max-count=50000');
+  // const commits = await git.logCustom('--date-order', '--max-count=50000');
+  const commits = await git.logRaw('--date-order', '--max-count=50000');
   renderCommits(commits);
 }
 

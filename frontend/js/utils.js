@@ -23,3 +23,15 @@ export function asTextContent(input) {
   tempElement.textContent = input;
   return tempElement.innerHTML;
 }
+
+
+export function splitOnce(inputString, separator) {
+  const firstIndexOfSeparator = inputString.indexOf(separator);
+  if (firstIndexOfSeparator === -1) {
+    return [inputString, ''];
+  }
+  return [
+    inputString.slice(0, firstIndexOfSeparator),
+    inputString.slice(firstIndexOfSeparator + separator.length),
+  ];
+}
