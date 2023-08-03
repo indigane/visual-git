@@ -105,7 +105,7 @@ export function parseLogCustomFormat(commandOutput) {
 // Example of a minimal person line is `n <> 0 +0000`.
 // Empty name is not allowed by git.
 // Multiple `<` and `>` are not allowed by git.
-const LOG_RAW_PERSON_REGEX = /(?<name>.+) <(?<email>.*)> (?<timestamp>.+) (?<time_offset>.+)/;
+const LOG_RAW_PERSON_REGEX = /^(?<name>.+) <(?<email>.*)> (?<timestamp>.+) (?<time_offset>.+)$/;
 
 export function parseLogRaw(commandOutput) {
   const commits = [];

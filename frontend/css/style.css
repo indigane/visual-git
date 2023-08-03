@@ -24,11 +24,22 @@
   --offset-left: calc(var(--indent-size) * var(--indent-level));
   width: 100vw;
   height: 100vh;
-  contain: strict;
 }
 .commit .graph circle {
   fill: currentColor;
   cx: calc(var(--size) / 2 + var(--offset-left));
   cy: calc(var(--size) / 2);
   r: calc(var(--size) / 8);
+}
+
+.edges {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 100vw;
+  height: 100vh;
+}
+.edges polyline {
+  stroke: black;
+  stroke-width: 4px;
 }

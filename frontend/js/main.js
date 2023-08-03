@@ -5,6 +5,8 @@ import { asTextContent, requestIdlePromise } from './utils.js';
 
 async function renderCommits(commits) {
   const commitsContainer = document.querySelector('.commits');
+  const edgesContainer = document.querySelector('.edges');
+  const openEdges = [];
   const latestCommitsByIndentLevel = [];
   const maxCommits = 50000;
   const batchSize = 1000;
@@ -25,6 +27,7 @@ async function renderCommits(commits) {
       <div class="message">${asTextContent(commit.subject)}</div>
     </div>
     `.trim());
+    updateEdges(commit, index, indentLevel);
   }
   updateMaxIndent();
 
@@ -69,6 +72,30 @@ async function renderCommits(commits) {
     }
     latestCommitsByIndentLevel[resultIndentLevel] = commit;
     return resultIndentLevel;
+  }
+
+  function updateEdges(commit, rowIndex, indentLevel) {
+    const rowSize = 32;
+    const indentSize = 32;
+    const xOffset = indentSize / 2;
+    const yOffset = rowSize / 2;
+    if (commit.parents) {
+      for (const [parentIndex, parentId] of commit.parents.entries()) {
+        const edgeElement = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        edgeElement._parentId = parentId;
+        edgeElement._startPosition = [indentLevel, rowIndex];
+        edgeElement._parentIndex = parentIndex;
+        edgesContainer.appendChild(edgeElement);
+        openEdges.push(edgeElement);
+      }
+    }
+    for (const edgeElement of openEdges) {
+      const [startX, startY] = edgeElement._startPosition;
+      const points = [];
+      points.push(`${startX * indentSize + xOffset},${startY * rowSize + yOffset}`);
+      points.push(`${(startX + edgeElement._parentIndex) * indentSize + xOffset},${(startY + 1) * rowSize + yOffset}`);
+      edgeElement.setAttribute('points', [points].join(' '));
+    }
   }
 }
 
