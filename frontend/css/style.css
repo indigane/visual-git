@@ -42,4 +42,5 @@
 .edges polyline {
   stroke: black;
   stroke-width: 4px;
+  fill: transparent;
 }
