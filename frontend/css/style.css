@@ -1,5 +1,7 @@
 .commits {
+  position: relative;
   --max-indent: 1;
+  z-index: 2;
 }
 .commit {
   --index: 0;
@@ -38,6 +40,7 @@
   left: 8px;
   width: 100vw;
   height: 100vh;
+  z-index: 1;
 }
 .edges polyline {
   stroke: black;

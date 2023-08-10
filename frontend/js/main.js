@@ -75,6 +75,7 @@ async function renderCommits(commits) {
   }
 
   function updateEdges(commit, rowIndex, indentLevel) {
+    const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
     const rowSize = 32;
     const indentSize = 32;
     const xOffset = indentSize / 2;
@@ -111,6 +112,7 @@ async function renderCommits(commits) {
         openEdges.splice(edgeIndex, 1);
       }
       edgeElement.setAttribute('points', [points].join(' '));
+      edgeElement.style.stroke = colors[edgeIndex % colors.length];
     }
   }
 }
