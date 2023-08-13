@@ -19,10 +19,10 @@ const isValidPath = (() => {
   const nonAlphanumericCharacterBeforeDot = /[^a-z0-9]\./i;
   const nonAlphanumericCharacterAfterDot = /\.[^a-z0-9]/i;
   return function isValidPath(inputPath) {
-    inputPath = path.normalize(inputPath);
     if (containsDisallowedCharacters.test(inputPath)) {
       return false;
     }
+    inputPath = path.normalize(inputPath);
     if (nonAlphanumericCharacterBeforeDot.test(inputPath)) {
       return false;
     }
