@@ -6,6 +6,7 @@ import { asTextContent, requestIdlePromise } from './utils.js';
 async function renderCommits(commits) {
   const commitsContainer = document.querySelector('.commits');
   const edgesContainer = document.querySelector('.edges');
+  const edgeColors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
   const openEdges = [];
   const latestCommitsByIndentLevel = [];
   const maxCommits = 50000;
@@ -75,44 +76,48 @@ async function renderCommits(commits) {
   }
 
   function updateEdges(commit, rowIndex, indentLevel) {
-    const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
     const rowSize = 32;
     const indentSize = 32;
     const xOffset = indentSize / 2;
     const yOffset = rowSize / 2;
+    updateOpenEdges();
     if (commit.parents) {
       for (const [parentIndex, parentId] of commit.parents.entries()) {
         const edgeElement = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
         edgeElement._parentId = parentId;
         edgeElement._startPosition = [indentLevel, rowIndex];
         edgeElement._parentIndex = parentIndex;
+        edgeElement._startColor = edgeColors[indentLevel % edgeColors.length];
         edgesContainer.appendChild(edgeElement);
         openEdges.unshift(edgeElement);
       }
     }
-    for (const [edgeIndex, edgeElement] of openEdges.entries()) {
-      const [startX, startY] = edgeElement._startPosition;
-      const points = [];
-      // Start point
-      points.push(`${startX * indentSize + xOffset},${startY * rowSize + yOffset}`);
-      const isEdgeEndCommit = edgeElement._parentId === commit.id;
-      const isPrimaryParent = edgeElement._parentIndex === 0;
-      let edgeOuterIndent = indentLevel;
-      if (isEdgeEndCommit && indentLevel !== 0) {
-        edgeOuterIndent -= 1;
+    updateOpenEdges();
+    function updateOpenEdges() {
+      for (const [edgeIndex, edgeElement] of openEdges.entries()) {
+        const [startX, startY] = edgeElement._startPosition;
+        const points = [];
+        // Start point
+        points.push(`${startX * indentSize + xOffset},${startY * rowSize + yOffset}`);
+        const isEdgeEndCommit = edgeElement._parentId === commit.id;
+        const isPrimaryParent = edgeElement._parentIndex === 0;
+        let edgeOuterIndent = indentLevel;
+        if (isEdgeEndCommit || isPrimaryParent) {
+          edgeOuterIndent -= indentLevel;
+        }
+        // Corner on the same-ish row as start point
+        points.push(`${(startX + edgeOuterIndent + edgeElement._parentIndex) * indentSize + xOffset},${startY * rowSize + yOffset + yOffset}`);
+        // Corner on the same-ish row as end point
+        points.push(`${(startX + edgeOuterIndent + edgeElement._parentIndex) * indentSize + xOffset},${(startY + (rowIndex - startY)) * rowSize + yOffset - yOffset}`);
+        if (isEdgeEndCommit) {
+          // End point
+          const [endX, endY] = [indentLevel, rowIndex];
+          points.push(`${endX * indentSize + xOffset},${endY * rowSize + yOffset}`);
+          openEdges.splice(edgeIndex, 1);
+        }
+        edgeElement.setAttribute('points', [points].join(' '));
+        edgeElement.style.stroke = isPrimaryParent ? edgeElement._startColor : edgeColors[indentLevel % edgeColors.length];
       }
-      // Corner on the same-ish row as start point
-      points.push(`${(startX + edgeOuterIndent + edgeElement._parentIndex) * indentSize + xOffset},${startY * rowSize + yOffset + yOffset}`);
-      // Corner on the same-ish row as end point
-      points.push(`${(startX + edgeOuterIndent + edgeElement._parentIndex) * indentSize + xOffset},${(startY + (rowIndex - startY)) * rowSize + yOffset - yOffset}`);
-      if (isEdgeEndCommit) {
-        // End point
-        const [endX, endY] = [indentLevel, rowIndex];
-        points.push(`${endX * indentSize + xOffset},${endY * rowSize + yOffset}`);
-        openEdges.splice(edgeIndex, 1);
-      }
-      edgeElement.setAttribute('points', [points].join(' '));
-      edgeElement.style.stroke = colors[edgeIndex % colors.length];
     }
   }
 }

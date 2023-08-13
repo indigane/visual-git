@@ -39,7 +39,7 @@
   top: 8px;
   left: 8px;
   width: 100vw;
-  height: 100vh;
+  height: 1000vh;
   z-index: 1;
 }
 .edges polyline {
