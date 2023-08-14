@@ -102,7 +102,10 @@ async function renderCommits(commits) {
         const isEdgeEndCommit = edgeElement._parentId === commit.id;
         const isPrimaryParent = edgeElement._parentIndex === 0;
         let edgeOuterIndent = indentLevel;
-        if (isEdgeEndCommit || isPrimaryParent) {
+        if ( ! isPrimaryParent) {
+          edgeOuterIndent -= 1;
+        }
+        else if (isEdgeEndCommit) {
           edgeOuterIndent -= indentLevel;
         }
         // Corner on the same-ish row as start point
