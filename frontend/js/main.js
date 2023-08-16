@@ -101,17 +101,17 @@ async function renderCommits(commits) {
         points.push(`${startX * indentSize + xOffset},${startY * rowSize + yOffset}`);
         const isEdgeEndCommit = edgeElement._parentId === commit.id;
         const isPrimaryParent = edgeElement._parentIndex === 0;
-        let edgeOuterIndent = indentLevel;
+        let edgeIndent = indentLevel;
         if ( ! isPrimaryParent) {
-          edgeOuterIndent -= 1;
+          edgeIndent -= 1;
         }
         else if (isEdgeEndCommit) {
-          edgeOuterIndent -= indentLevel;
+          edgeIndent -= indentLevel;
         }
         // Corner on the same-ish row as start point
-        points.push(`${(startX + edgeOuterIndent + edgeElement._parentIndex) * indentSize + xOffset},${startY * rowSize + yOffset + yOffset}`);
+        points.push(`${(startX + edgeIndent + edgeElement._parentIndex) * indentSize + xOffset},${startY * rowSize + yOffset + yOffset}`);
         // Corner on the same-ish row as end point
-        points.push(`${(startX + edgeOuterIndent + edgeElement._parentIndex) * indentSize + xOffset},${(startY + (rowIndex - startY)) * rowSize + yOffset - yOffset}`);
+        points.push(`${(startX + edgeIndent + edgeElement._parentIndex) * indentSize + xOffset},${(startY + (rowIndex - startY)) * rowSize + yOffset - yOffset}`);
         if (isEdgeEndCommit) {
           // End point
           const [endX, endY] = [indentLevel, rowIndex];
