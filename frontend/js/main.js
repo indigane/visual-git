@@ -1,134 +1,202 @@
 import * as git from './git-commands.js';
-import { EMPTY_INDENT_LEVEL } from './commit.js';
 import { asTextContent, requestIdlePromise } from './utils.js';
+
+
+class Path {
+  constructor({nodes}) {
+    this.nodes = nodes;
+    this.columnIndex = undefined;
+  }
+
+  getStartIndex() {
+    return this.nodes[0].row;
+  }
+
+  getEndIndex() {
+    return this.nodes.slice(-1)[0].row;
+  }
+
+  compare(pathB) {
+    // In the future this should also check branch order (main, develop, features, etc)
+    const pathA = this;
+    return pathB.getStartIndex() - pathA.getStartIndex();
+  }
+}
+
+
+class Node {
+  constructor({commit, path, row}) {
+    this.commit = commit;
+    this.path = path;
+    this.row = row;
+  }
+}
 
 
 async function renderCommits(commits) {
   const commitsContainer = document.querySelector('.commits');
   const edgesContainer = document.querySelector('.edges');
-  const edgeColors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
-  const openEdges = [];
-  const latestCommitsByIndentLevel = [];
-  const maxCommits = 50000;
-  const batchSize = 1000;
-  for (const [index, commit] of commits.slice(0, maxCommits).entries()) {
+  const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
+
+  // Collect paths of nodes
+  const paths = [];
+  const pathForCommitId = new Map();
+  const nodeForCommitId = new Map();
+  for (const [index, commit] of commits.entries()) {
+    // Non-blocking iteration
+    const batchSize = 1000;
+    const maxWaitMs = 100;
     const isBatchSizeReached = index !== 0 && index % batchSize === 0;
     if (isBatchSizeReached) {
-      updateMaxIndent();
-      await requestIdlePromise(100);
+      await requestIdlePromise(maxWaitMs);
     }
-    const indentLevel = updateIndentLevels(commit);
+    // Create new path if necessary
+    if ( ! pathForCommitId.has(commit.id)) {
+      const newPath = new Path({
+        nodes: [],
+      });
+      paths.push(newPath);
+      pathForCommitId.set(commit.id, newPath);
+    }
+    // Place node on a path
+    const path = pathForCommitId.get(commit.id);
+    const node = new Node({
+      commit,
+      path,
+      row: index,
+    });
+    path.nodes.push(node);
+    nodeForCommitId.set(commit.id, node);
+    // Tentatively place primary parent on the same path, based on path precedence
+    const primaryParentId = commit.parents[0];
+    const existingPath = pathForCommitId.get(primaryParentId);
+    if (primaryParentId === undefined) {
+      // No parents, do nothing.
+    }
+    else if (existingPath !== undefined && path.compare(existingPath) < 0) {
+      // Existing path has precedence, do nothing.
+    }
+    else {
+      // No existing path, or new path has precedence.
+      pathForCommitId.set(primaryParentId, path);
+    }
+  }
+
+  // Select columns for paths
+  const columns = [];
+  for (const [pathIndex, path] of paths.entries()) {
+    let selectedColumnIndex = undefined;
+    for (const column of columns) {
+      if (column.endRowIndex <= path.getStartIndex()) {
+        column.endRowIndex = path.getEndIndex();
+        selectedColumnIndex = column.columnIndex;
+        break;
+      }
+    }
+    if (selectedColumnIndex === undefined) {
+      const column = {
+        columnIndex: columns.length,
+        endRowIndex: path.getEndIndex(),
+      };
+      columns.push(column);
+      selectedColumnIndex = column.columnIndex;
+    }
+    path.columnIndex = selectedColumnIndex;
+  }
+  // Update max column
+  const maxColumn = columns.length;
+  commitsContainer.style.setProperty('--max-column', maxColumn);
+
+  // Draw nodes and edges
+  for (const [index, commit] of commits.entries()) {
+    // Non-blocking iteration
+    const batchSize = 1000;
+    const maxWaitMs = 100;
+    const isBatchSizeReached = index !== 0 && index % batchSize === 0;
+    if (isBatchSizeReached) {
+      await requestIdlePromise(maxWaitMs);
+    }
+    // Node
+    const node = nodeForCommitId.get(commit.id);
     commitsContainer.insertAdjacentHTML('beforeend', `
-    <div class="commit" style="--index: ${index}; --indent-level: ${indentLevel};" data-id="${commit.id}">
+    <div class="commit" style="--row: ${node.row}; --column: ${node.path.columnIndex};" data-id="${node.commit.id}">
       <div class="graph">
         <svg>
           <circle>
         </svg>
       </div>
-      <div class="message">${asTextContent(commit.subject)}</div>
+      <div class="message">${asTextContent(node.commit.subject)}</div>
     </div>
     `.trim());
-    updateEdges(commit, index, indentLevel);
-  }
-  updateMaxIndent();
-
-  function updateMaxIndent() {
-    const maxIndent = latestCommitsByIndentLevel.length;
-    commitsContainer.style.setProperty('--max-indent', maxIndent);
-  }
-
-  function updateIndentLevels(commit) {
-    let resultIndentLevel = null;
-    let firstEmptyIndentLevel = null;
-    // We keep track of the latest rendered commit in each indent level,
-    // so that we can render parents of that commit in the same indent level.
-    for (const [indentLevel, latestCommit] of latestCommitsByIndentLevel.entries()) {
-      if (latestCommit === EMPTY_INDENT_LEVEL) {
-        // Keep track of the first empty indent level in case we need to render the commit in it.
-        if (firstEmptyIndentLevel === null) {
-          firstEmptyIndentLevel = indentLevel;
-        }
-        continue;
-      }
-      const positionInParents = latestCommit.parents?.indexOf(commit.id) ?? -1;
-      const isPrimaryParent = positionInParents === 0;
-      //const isSecondaryParent = positionInParents >= 1;
-      // We will render the commit in the first indent level where the commit is the primary parent.
-      if (isPrimaryParent && resultIndentLevel === null) {
-        resultIndentLevel = indentLevel;
-      }
-      // For any other indent levels where the commit is the primary parent, if it is also the only parent,
-      // we can set that indent level as empty to free it up for commits next in the iteration.
-      else if (isPrimaryParent && latestCommit.parents.length === 1) {
-        latestCommitsByIndentLevel[indentLevel] = EMPTY_INDENT_LEVEL;
-      }
-    }
-    // If the commit was not found to be a parent of any already rendered commits,
-    // then render it in the first empty indent level.
-    if (resultIndentLevel === null) {
-      if (firstEmptyIndentLevel === null) {
-        firstEmptyIndentLevel = latestCommitsByIndentLevel.length;
-      }
-      resultIndentLevel = firstEmptyIndentLevel;
-    }
-    latestCommitsByIndentLevel[resultIndentLevel] = commit;
-    return resultIndentLevel;
-  }
-
-  function updateEdges(commit, rowIndex, indentLevel) {
-    const rowSize = 32;
-    const indentSize = 32;
-    const xOffset = indentSize / 2;
-    const yOffset = rowSize / 2;
-    updateOpenEdges();
-    if (commit.parents) {
-      for (const [parentIndex, parentId] of commit.parents.entries()) {
+    // Edges
+    const rowHeight = 32;
+    const columnWidth = 32;
+    const xOffset = columnWidth / 2;
+    const yOffset = rowHeight / 2;
+    for (const [parentIndex, parentId] of commit.parents.entries()) {
+      const isPrimaryParent = parentIndex === 0;
+      const parentNode = nodeForCommitId.get(parentId);
+      if (node.path === parentNode.path) {
+        // Edge is within the same path. Draw a simple line.
+        const color = colors[node.path.columnIndex % colors.length];
         const edgeElement = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-        edgeElement._parentId = parentId;
-        edgeElement._startPosition = [indentLevel, rowIndex];
-        edgeElement._parentIndex = parentIndex;
-        edgeElement._startColor = edgeColors[indentLevel % edgeColors.length];
         edgesContainer.appendChild(edgeElement);
-        openEdges.unshift(edgeElement);
-      }
-    }
-    updateOpenEdges();
-    function updateOpenEdges() {
-      for (const [edgeIndex, edgeElement] of openEdges.entries()) {
-        const [startX, startY] = edgeElement._startPosition;
         const points = [];
-        // Start point
-        points.push(`${startX * indentSize + xOffset},${startY * rowSize + yOffset}`);
-        const isEdgeEndCommit = edgeElement._parentId === commit.id;
-        const isPrimaryParent = edgeElement._parentIndex === 0;
-        let edgeIndent = indentLevel;
-        if ( ! isPrimaryParent) {
-          edgeIndent -= 1;
-        }
-        else if (isEdgeEndCommit) {
-          edgeIndent -= indentLevel;
-        }
-        // Corner on the same-ish row as start point
-        points.push(`${(startX + edgeIndent + edgeElement._parentIndex) * indentSize + xOffset},${startY * rowSize + yOffset + yOffset}`);
-        // Corner on the same-ish row as end point
-        points.push(`${(startX + edgeIndent + edgeElement._parentIndex) * indentSize + xOffset},${(startY + (rowIndex - startY)) * rowSize + yOffset - yOffset}`);
-        if (isEdgeEndCommit) {
-          // End point
-          const [endX, endY] = [indentLevel, rowIndex];
-          points.push(`${endX * indentSize + xOffset},${endY * rowSize + yOffset}`);
-          openEdges.splice(edgeIndex, 1);
-        }
+        const startX = node.path.columnIndex;
+        const startY = node.row;
+        points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
+        const endX = parentNode.path.columnIndex;
+        const endY = parentNode.row;
+        points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
         edgeElement.setAttribute('points', [points].join(' '));
-        edgeElement.style.stroke = isPrimaryParent ? edgeElement._startColor : edgeColors[indentLevel % edgeColors.length];
+        edgeElement.style.stroke = color;
+      }
+      else if (isPrimaryParent) {
+        // Edge is converging. Draw a line with a corner.
+        const color = colors[node.path.columnIndex % colors.length];
+        const edgeElement = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        edgesContainer.appendChild(edgeElement);
+        const points = [];
+        const startX = node.path.columnIndex;
+        const startY = node.row;
+        points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
+        const cornerX = node.path.columnIndex;
+        const cornerY = parentNode.row;
+        points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight}`);
+        const endX = parentNode.path.columnIndex;
+        const endY = parentNode.row;
+        points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+        edgeElement.setAttribute('points', [points].join(' '));
+        edgeElement.style.stroke = color;
+      }
+      else {
+        // Edge is diverging. Draw a line with a corner.
+        const color = colors[parentNode.path.columnIndex % colors.length];
+        const edgeElement = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        edgesContainer.appendChild(edgeElement);
+        const points = [];
+        const startX = node.path.columnIndex;
+        const startY = node.row;
+        points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
+        const cornerX = parentNode.path.columnIndex;
+        const cornerY = node.row;
+        points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight + yOffset * 2}`);
+        const endX = parentNode.path.columnIndex;
+        const endY = parentNode.row;
+        points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+        edgeElement.setAttribute('points', [points].join(' '));
+        edgeElement.style.stroke = color;
       }
     }
   }
 }
 
+
 async function woop() {
   // const commits = await git.logCustom('--date-order', '--max-count=50000');
   const commits = await git.logRaw('--date-order', '--max-count=50000');
-  renderCommits(commits);
+  const maxCommits = 50000;
+  renderCommits(commits.slice(0, maxCommits));
 }
 
 woop();
