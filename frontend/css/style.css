@@ -36,7 +36,7 @@
   fill: currentColor;
   cx: calc(var(--size) / 2 + var(--offset-left));
   cy: calc(var(--size) / 2);
-  r: calc(var(--size) / 8);
+  r: calc(var(--size) / 10);
 }
 
 .edges {
@@ -49,6 +49,7 @@
 }
 .edges polyline {
   stroke: black;
-  stroke-width: 4px;
+  stroke-width: 2px;
   fill: transparent;
+  stroke-dashoffset: -5px;
 }
