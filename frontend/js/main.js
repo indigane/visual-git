@@ -16,6 +16,30 @@ class Path {
     return this.nodes.slice(-1)[0].row;
   }
 
+  getExtendedStartIndex() {
+    // Includes space for edges connecting this path to other paths
+    const firstNode = this.nodes[0];
+    let startIndex = firstNode.row;
+    for (const childNode of firstNode.children) {
+      if (childNode.row < startIndex) {
+        startIndex = childNode.row;
+      }
+    }
+    return startIndex;
+  }
+
+  getExtendedEndIndex() {
+    // Includes space for edges connecting this path to other paths
+    const lastNode = this.nodes.slice(-1)[0];
+    let endIndex = lastNode.row;
+    for (const parentNode of lastNode.parents) {
+      if (parentNode.row > endIndex) {
+        endIndex = parentNode.row;
+      }
+    }
+    return endIndex;
+  }
+
   compare(pathB) {
     // In the future this should also check branch order (main, develop, features, etc)
     const pathA = this;
@@ -29,6 +53,8 @@ class Node {
     this.commit = commit;
     this.path = path;
     this.row = row;
+    this.children = [];
+    this.parents = [];
   }
 }
 
@@ -44,6 +70,7 @@ async function renderCommits(commits) {
   const paths = [];
   const pathForCommitId = new Map();
   const nodeForCommitId = new Map();
+  const childIdsForCommitId = new Map();
   for (const [index, commit] of commits.entries()) {
     // Non-blocking iteration
     const batchSize = 1000;
@@ -82,6 +109,27 @@ async function renderCommits(commits) {
       // No existing path, or new path has precedence.
       pathForCommitId.set(primaryParentId, path);
     }
+    // Keep track of child ids for node relationships
+    for (const parentId of commit.parents) {
+      if ( ! childIdsForCommitId.has(parentId)) {
+        childIdsForCommitId.set(parentId, []);
+      }
+      childIdsForCommitId.get(parentId).push(commit.id);
+    }
+    // Update node relationships
+    for (const childId of childIdsForCommitId.get(commit.id) ?? []) {
+      const childNode = nodeForCommitId.get(childId);
+      if (childNode === undefined) {
+        continue;
+      }
+      node.children.push(childNode);
+      for (const [parentIndex, parentId] of childNode.commit.parents.entries() ?? []) {
+        const parentNode = nodeForCommitId.get(parentId);
+        if (parentNode !== undefined) {
+          childNode.parents[parentIndex] = parentNode;
+        }
+      }
+    }
   }
 
   // Select columns for paths
@@ -89,8 +137,8 @@ async function renderCommits(commits) {
   for (const [pathIndex, path] of paths.entries()) {
     let selectedColumnIndex = undefined;
     for (const column of columns) {
-      if (column.endRowIndex <= path.getStartIndex()) {
-        column.endRowIndex = path.getEndIndex();
+      if (column.endRowIndex <= path.getExtendedStartIndex()) {
+        column.endRowIndex = path.getExtendedEndIndex();
         selectedColumnIndex = column.columnIndex;
         break;
       }
@@ -98,7 +146,7 @@ async function renderCommits(commits) {
     if (selectedColumnIndex === undefined) {
       const column = {
         columnIndex: columns.length,
-        endRowIndex: path.getEndIndex(),
+        endRowIndex: path.getExtendedEndIndex(),
       };
       columns.push(column);
       selectedColumnIndex = column.columnIndex;
@@ -136,7 +184,7 @@ async function renderCommits(commits) {
     const columnWidth = 32;
     const xOffset = columnWidth / 2;
     const yOffset = rowHeight / 2;
-    const endGap = rowHeight / 6;
+    const cornerOffset = rowHeight / 3;
     for (const [parentIndex, parentId] of commit.parents.entries()) {
       const isPrimaryParent = parentIndex === 0;
       const parentNode = nodeForCommitId.get(parentId);
@@ -154,7 +202,7 @@ async function renderCommits(commits) {
         const endX = parentNode.path.columnIndex;
         const endY = parentNode.row;
         points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
-        edgeElement.style.stroke = colors[node.path.columnIndex % colors.length];
+        edgeElement.style.stroke = colors[node.path.getStartIndex() % colors.length];
       }
       else if (isPrimaryParent) {
         // Edge is converging. Draw a line with a corner.
@@ -163,11 +211,11 @@ async function renderCommits(commits) {
         points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
         const cornerX = node.path.columnIndex;
         const cornerY = parentNode.row;
-        points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight}`);
+        points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight + yOffset - cornerOffset}`);
         const endX = parentNode.path.columnIndex;
         const endY = parentNode.row;
         points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
-        edgeElement.style.stroke = colors[node.path.columnIndex % colors.length];
+        edgeElement.style.stroke = colors[node.path.getStartIndex() % colors.length];
       }
       else {
         // Edge is diverging. Draw a line with a corner.
@@ -176,11 +224,11 @@ async function renderCommits(commits) {
         points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
         const cornerX = parentNode.path.columnIndex;
         const cornerY = node.row;
-        points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight + yOffset * 2}`);
+        points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight + yOffset + cornerOffset}`);
         const endX = parentNode.path.columnIndex;
         const endY = parentNode.row;
         points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
-        edgeElement.style.stroke = colors[parentNode.path.columnIndex % colors.length];
+        edgeElement.style.stroke = colors[parentNode.path.getStartIndex() % colors.length];
       }
       edgesContainer.appendChild(edgeElement);
       edgeElement.setAttribute('points', [points].join(' '));
