@@ -7,15 +7,15 @@ class Path {
     this.nodes = nodes;
     this.columnIndex = undefined;
   }
-
+  getId() {
+    return this.nodes[0].commit.id;
+  }
   getStartIndex() {
     return this.nodes[0].row;
   }
-
   getEndIndex() {
     return this.nodes.slice(-1)[0].row;
   }
-
   getExtendedStartIndex() {
     // Includes space for edges connecting this path to other paths
     const firstNode = this.nodes[0];
@@ -27,7 +27,6 @@ class Path {
     }
     return startIndex;
   }
-
   getExtendedEndIndex() {
     // Includes space for edges connecting this path to other paths
     const lastNode = this.nodes.slice(-1)[0];
@@ -39,7 +38,10 @@ class Path {
     }
     return endIndex;
   }
-
+  getPrimaryParentPath() {
+    const lastNode = this.nodes.slice(-1)[0];
+    return lastNode.parents[0]?.path;
+  }
   compare(pathB) {
     // In the future this should also check branch order (main, develop, features, etc)
     const pathA = this;
@@ -132,13 +134,50 @@ async function renderCommits(commits) {
     }
   }
 
+  // Sort paths
+  for (const path of paths) {
+    path.mergeCount = 0;
+    for (const node of path.nodes) {
+      if (node.parents.length > 1) {
+        path.mergeCount += 1;
+      }
+    }
+  }
+  paths.sort((pathA, pathB) => {
+    const pathALength = pathA.getExtendedEndIndex() - pathA.getExtendedStartIndex();
+    const pathBLength = pathB.getExtendedEndIndex() - pathB.getExtendedStartIndex();
+    const pathAPriority = pathA.mergeCount === 0 ? pathA.getPrimaryParentPath()?.mergeCount ?? pathA.mergeCount : pathA.mergeCount;
+    const pathBPriority = pathB.mergeCount === 0 ? pathB.getPrimaryParentPath()?.mergeCount ?? pathB.mergeCount : pathB.mergeCount;
+    //return pathBLength - pathALength;
+    if (pathBPriority - pathAPriority === 0) {
+      return pathBLength - pathALength;
+    }
+    return pathBPriority - pathAPriority;
+  });
+
   // Select columns for paths
   const columns = [];
   for (const [pathIndex, path] of paths.entries()) {
+    const pathStart = path.getExtendedStartIndex();
+    const pathEnd = path.getExtendedEndIndex();
+    const minColumnIndex = path.getPrimaryParentPath()?.columnIndex ?? 0;
     let selectedColumnIndex = undefined;
     for (const column of columns) {
-      if (column.endRowIndex <= path.getExtendedStartIndex()) {
-        column.endRowIndex = path.getExtendedEndIndex();
+      if (column.columnIndex < minColumnIndex) {
+        continue;
+      }
+      let isOverlappingOccupiedRange = false;
+      for (const {start, end} of column.occupiedRanges) {
+        if (pathStart < end && pathEnd > start) {
+          isOverlappingOccupiedRange = true;
+          break;
+        }
+      }
+      if (isOverlappingOccupiedRange) {
+        continue;
+      }
+      else {
+        column.occupiedRanges.push({start: pathStart, end: pathEnd});
         selectedColumnIndex = column.columnIndex;
         break;
       }
@@ -146,7 +185,7 @@ async function renderCommits(commits) {
     if (selectedColumnIndex === undefined) {
       const column = {
         columnIndex: columns.length,
-        endRowIndex: path.getExtendedEndIndex(),
+        occupiedRanges: [{start: pathStart, end: pathEnd}],
       };
       columns.push(column);
       selectedColumnIndex = column.columnIndex;
