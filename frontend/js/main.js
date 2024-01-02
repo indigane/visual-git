@@ -202,7 +202,7 @@ async function renderCommits(commits) {
         const endX = parentNode.path.columnIndex;
         const endY = parentNode.row;
         points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
-        edgeElement.style.stroke = colors[node.path.getStartIndex() % colors.length];
+        edgeElement.style.stroke = colors[node.path.columnIndex % colors.length];
       }
       else if (isPrimaryParent) {
         // Edge is converging. Draw a line with a corner.
@@ -215,7 +215,7 @@ async function renderCommits(commits) {
         const endX = parentNode.path.columnIndex;
         const endY = parentNode.row;
         points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
-        edgeElement.style.stroke = colors[node.path.getStartIndex() % colors.length];
+        edgeElement.style.stroke = colors[node.path.columnIndex % colors.length];
       }
       else {
         // Edge is diverging. Draw a line with a corner.
@@ -228,7 +228,7 @@ async function renderCommits(commits) {
         const endX = parentNode.path.columnIndex;
         const endY = parentNode.row;
         points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
-        edgeElement.style.stroke = colors[parentNode.path.getStartIndex() % colors.length];
+        edgeElement.style.stroke = colors[parentNode.path.columnIndex % colors.length];
       }
       edgesContainer.appendChild(edgeElement);
       edgeElement.setAttribute('points', [points].join(' '));

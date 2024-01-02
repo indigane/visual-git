@@ -29,8 +29,9 @@
 .commit .graph svg {
   --size: var(--row-height);
   --offset-left: calc(var(--column-width) * var(--column));
-  width: 100vw;
-  height: 100vh;
+  width: 32px;
+  height: 32px;
+  overflow: visible;
 }
 .commit .graph circle {
   fill: currentColor;
@@ -43,8 +44,9 @@
   position: absolute;
   top: 8px;
   left: 8px;
-  width: 100vw;
-  height: 1000vh;
+  width: 32px;
+  height: 32px;
+  overflow: visible;
   z-index: 1;
 }
 .edges polyline {
