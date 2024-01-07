@@ -78,16 +78,6 @@ server.listen(3000, () => {
 //
 import { spawn } from 'node:child_process';
 
-// TODO: Better validation?
-const commandAllowList = [
-  `["log","--all","--oneline","--reflog"]`,
-  `["log","--all","--pretty=raw"]`,
-  `["log","--pretty=raw","--date-order","--max-count=50000"]`,
-  `["log","--decorate=full","--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %G?%n%n%w(0,0,1) %s %w(0,0,0)%n%n%w(0,0,1) %b %w(0,0,0)%n%n%w(0,0,1) %N %w(0,0,0)%n%n"]`,
-  `["log","--decorate=full","--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %G?%n%n%w(0,0,1) %s %w(0,0,0)%n%n%w(0,0,1) %b %w(0,0,0)%n%n%w(0,0,1) %N %w(0,0,0)%n%n","--date-order"]`,
-  `["log","--decorate=full","--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %n%n%w(0,0,1) %s %w(0,0,0)%n%n%w(0,0,1) %b %w(0,0,0)%n%n%w(0,0,1) %N %w(0,0,0)%n%n","--date-order"]`,
-  `["log","--decorate=full","--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %n%n%w(0,0,1) %s %w(0,0,0)%n%n%w(0,0,1) %b %w(0,0,0)%n%n%w(0,0,1) %N %w(0,0,0)%n%n","--date-order","--max-count=50000"]`,
-];
 // TODO: Where do we get repository path from? For now it is a command line argument, or current directory.
 let repositoryPath;
 if (process.argv[2]) {
@@ -98,11 +88,18 @@ else {
   repositoryPath = (await runCommand('git', ['rev-parse', '--absolute-git-dir'])).trim();
 }
 
-function handleCommand(commandArguments) {
+function handleCommand(commandArgumentsJson) {
   return new Promise((resolve, reject) => {
-    // TODO: Do we need CSRF checks?
-    if (commandAllowList.includes(commandArguments)) {
-      commandArguments = JSON.parse(commandArguments);
+    // TODO: Do we need CSRF checks? We could probably avoid the need for that by triggering CORS checks.
+    let commandArguments;
+    try {
+      // TODO: Do some basic validation before parsing JSON?
+      commandArguments = JSON.parse(commandArgumentsJson);
+    } catch (err) {
+      console.log('Could not parse commandArguments JSON: ' + err);
+      reject('invalid-command-arguments-json');
+    }
+    if (commandArguments && validateArguments(commandArguments)) {
       // Repository path can contain spaces, child_process.spawn does not care.
       runCommand('git', [`--git-dir=${repositoryPath}`, ...commandArguments])
       .then(result => resolve(result))
@@ -111,8 +108,8 @@ function handleCommand(commandArguments) {
         reject('git-error');
       });
     } else {
-      console.log('Unknown command: ' + commandArguments);
-      reject('unknown-command');
+      console.log('Invalid command arguments: ' + commandArguments);
+      reject('invalid-command-arguments');
     }
   });
 }
@@ -137,4 +134,44 @@ function runCommand(executable, args) {
       }
     });
   });
+}
+
+function validateArguments(commandArguments) {
+  const [gitCommand, ...args] = commandArguments;
+  const allowedCommands = {
+    'log': {
+      allowedArguments: [
+        '--all',
+        '--oneline',
+        '--reflog',
+        '--pretty=raw',
+        '--decorate=full',
+        '--date-order',
+        '--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %G?%n%n%w(0,0,1) %s %w(0,0,0)%n%n%w(0,0,1) %b %w(0,0,0)%n%n%w(0,0,1) %N %w(0,0,0)%n%n',
+        '--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %n%n%w(0,0,1) %s %w(0,0,0)%n%n%w(0,0,1) %b %w(0,0,0)%n%n%w(0,0,1) %N %w(0,0,0)%n%n',
+      ],
+      allowedArgumentsRegex: makeArgumentsRegex(
+        /--max-count=\d+/,
+      ),
+    },
+  };
+
+  if ( ! gitCommand in allowedCommands) {
+    return false;
+  }
+
+  const { allowedArguments, allowedArgumentsRegex } = allowedCommands[gitCommand];
+  for (const argument of args) {
+    if ( ! allowedArguments.includes(argument) && ! allowedArgumentsRegex.test(argument)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function makeArgumentsRegex(...regexArray) {
+  return new RegExp(
+    '(?:' + regexArray.map(regex => '^' + regex.source + '$').join('|') + ')'
+  );
 }
