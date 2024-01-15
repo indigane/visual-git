@@ -19,10 +19,10 @@ const isValidPath = (() => {
   const nonAlphanumericCharacterBeforeDot = /[^a-z0-9]\./i;
   const nonAlphanumericCharacterAfterDot = /\.[^a-z0-9]/i;
   return function isValidPath(inputPath) {
-    inputPath = path.normalize(inputPath);
     if (containsDisallowedCharacters.test(inputPath)) {
       return false;
     }
+    inputPath = path.normalize(inputPath);
     if (nonAlphanumericCharacterBeforeDot.test(inputPath)) {
       return false;
     }
@@ -78,27 +78,100 @@ server.listen(3000, () => {
 //
 import { spawn } from 'node:child_process';
 
-// TODO: Better validation?
-const commandAllowList = [
-  `["log","--all","--oneline","--reflog"]`,
-];
+// TODO: Where do we get repository path from? For now it is a command line argument, or current directory.
+let repositoryPath;
+if (process.argv[2]) {
+  repositoryPath = path.join(process.argv[2], '.git');
+}
+else {
+  // Ask git for --git-dir. This is mostly an example, as we could also omit --git-dir in this case.
+  repositoryPath = (await runCommand('git', ['rev-parse', '--absolute-git-dir'])).trim();
+}
 
-async function handleCommand(commandArguments) {
+function handleCommand(commandArgumentsJson) {
   return new Promise((resolve, reject) => {
-    // TODO: Do we need CSRF checks?
-    if (commandAllowList.includes(commandArguments)) {
-      commandArguments = JSON.parse(commandArguments);
-      const git = spawn('git', commandArguments);
-      let result = '';
-      git.stdout.on('data', (data) => {
-        result += data;
-      });
-      git.on('close', (exitCode) => {
-        console.log(`git exited with code ${exitCode}`);
-        resolve(result);
+    // TODO: Do we need CSRF checks? We could probably avoid the need for that by triggering CORS checks.
+    let commandArguments;
+    try {
+      // TODO: Do some basic validation before parsing JSON?
+      commandArguments = JSON.parse(commandArgumentsJson);
+    } catch (err) {
+      console.log('Could not parse commandArguments JSON: ' + err);
+      reject('invalid-command-arguments-json');
+    }
+    if (commandArguments && validateArguments(commandArguments)) {
+      // Repository path can contain spaces, child_process.spawn does not care.
+      runCommand('git', [`--git-dir=${repositoryPath}`, ...commandArguments])
+      .then(result => resolve(result))
+      .catch(error => {
+        console.log(error);
+        reject('git-error');
       });
     } else {
-      reject('unknown-command');
+      console.log('Invalid command arguments: ' + commandArguments);
+      reject('invalid-command-arguments');
     }
   });
+}
+
+function runCommand(executable, args) {
+  return new Promise((resolve, reject) => {
+    const command = spawn(executable, args);
+    let result = '';
+    let errorResult = '';
+    command.stdout.on('data', (data) => {
+      result += data;
+    });
+    command.stderr.on('data', (data) => {
+      errorResult += data;
+    });
+    command.on('close', (exitCode) => {
+      if (exitCode === 0) {
+        resolve(result);
+      }
+      else {
+        reject(errorResult);
+      }
+    });
+  });
+}
+
+function validateArguments(commandArguments) {
+  const [gitCommand, ...args] = commandArguments;
+  const allowedCommands = {
+    'log': {
+      allowedArguments: [
+        '--all',
+        '--oneline',
+        '--reflog',
+        '--pretty=raw',
+        '--decorate=full',
+        '--date-order',
+        '--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %G?%n%n%w(0,0,1) %s %w(0,0,0)%n%n%w(0,0,1) %b %w(0,0,0)%n%n%w(0,0,1) %N %w(0,0,0)%n%n',
+        '--format=%H%n %T%n %P%n %an%n %ae%n %aD%n %cn%n %ce%n %cD%n %e%n %D%n %S%n %n%n%w(0,0,1) %s %w(0,0,0)%n%n%w(0,0,1) %b %w(0,0,0)%n%n%w(0,0,1) %N %w(0,0,0)%n%n',
+      ],
+      allowedArgumentsRegex: makeArgumentsRegex(
+        /--max-count=\d+/,
+      ),
+    },
+  };
+
+  if ( ! gitCommand in allowedCommands) {
+    return false;
+  }
+
+  const { allowedArguments, allowedArgumentsRegex } = allowedCommands[gitCommand];
+  for (const argument of args) {
+    if ( ! allowedArguments.includes(argument) && ! allowedArgumentsRegex.test(argument)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function makeArgumentsRegex(...regexArray) {
+  return new RegExp(
+    '(?:' + regexArray.map(regex => '^' + regex.source + '$').join('|') + ')'
+  );
 }

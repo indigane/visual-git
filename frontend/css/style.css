@@ -1,3 +1,68 @@
-.result {
-  white-space: pre;
+html, body {
+  font-family: sans-serif;
+}
+.commits {
+  position: relative;
+  --max-column: 1;
+  z-index: 2;
+}
+.commit {
+  --row: 0;
+  --column: 0;
+  --column-width: 2em;
+  --row-height: 2em;
+  contain: size layout style;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: var(--row-height);
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translateY(calc(var(--row) * var(--row-height)));
+}
+.commit .ref {
+  display: inline-block;
+  font-size: 70%;
+  border: 1px solid #000000;
+  border-radius: 3px;
+  padding: 2px 4px;
+  margin-right: 2px;
+}
+.commit .graph {
+  --max-graph-width: 50vw;
+  --graph-width: min(calc(var(--column-width) * var(--max-column)), var(--max-graph-width));
+  width: var(--graph-width);
+  min-width: var(--graph-width);
+  height: var(--row-height);
+}
+.commit .graph svg {
+  --size: var(--row-height);
+  --offset-left: calc(var(--column-width) * var(--column));
+  width: 32px;
+  height: 32px;
+  overflow: visible;
+}
+.commit .graph circle {
+  fill: currentColor;
+  cx: calc(var(--size) / 2 + var(--offset-left));
+  cy: calc(var(--size) / 2);
+  r: calc(var(--size) / 10);
+}
+
+.edges {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 32px;
+  height: 32px;
+  overflow: visible;
+  z-index: 1;
+}
+.edges polyline {
+  stroke: black;
+  stroke-width: 2px;
+  fill: transparent;
+  stroke-dashoffset: -5px;
 }
