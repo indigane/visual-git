@@ -1,4 +1,5 @@
 import * as git from './git-commands.js';
+import { parseFullRefPath } from './parsers.js';
 import { asTextContent, requestIdlePromise } from './utils.js';
 
 
@@ -61,12 +62,21 @@ class Node {
 }
 
 
-async function renderCommits(commits) {
+async function renderCommits({ commits, refs }) {
   const commitsContainer = document.querySelector('.commits');
   const edgesContainer = document.querySelector('.edges');
   //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
   //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
   const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
+
+  // Reverse mapping for refs
+  const refsForCommitId = {};
+  for (const [refPath, commitId] of Object.entries(refs)) {
+    if (refsForCommitId[commitId] === undefined) {
+      refsForCommitId[commitId] = [];
+    }
+    refsForCommitId[commitId].push(refPath);
+  }
 
   // Collect paths of nodes
   const paths = [];
@@ -205,8 +215,23 @@ async function renderCommits(commits) {
     if (isBatchSizeReached) {
       await requestIdlePromise(maxWaitMs);
     }
+    function renderRef(fullRefPath) {
+      const { refType, refName } = parseFullRefPath(fullRefPath);
+      let refTypeClass;
+      if (refType === null) {
+        refTypeClass = 'special-ref';
+      }
+      else {
+        refTypeClass = `ref-${refType}`;
+      }
+      return `<div class="ref ${asTextContent(refTypeClass)}">${asTextContent(refName)}</div>`;
+    }
+    function renderRefs(refsToRender) {
+      return refsToRender.map(renderRef).join('');
+    }
     // Node
     const node = nodeForCommitId.get(commit.id);
+    const nodeRefs = refsForCommitId[commit.id] ?? [];
     const color = colors[node.path.columnIndex % colors.length];
     commitsContainer.insertAdjacentHTML('beforeend', `
     <div class="commit" style="--row: ${node.row}; --column: ${node.path.columnIndex};" data-id="${node.commit.id}">
@@ -215,7 +240,7 @@ async function renderCommits(commits) {
           <circle></circle>
         </svg>
       </div>
-      <div class="message">${asTextContent(node.commit.subject)}</div>
+      <div class="message">${renderRefs(nodeRefs)} ${asTextContent(node.commit.subject)}</div>
     </div>
     `.trim());
     // Edges
@@ -281,9 +306,12 @@ async function renderCommits(commits) {
 
 async function woop() {
   // const commits = await git.logCustom('--date-order', '--max-count=50000');
-  const commits = await git.logRaw('--date-order', '--max-count=50000');
+  const { commits, refs } = await git.logRaw('--date-order', '--max-count=50000');
   const maxCommits = 50000;
-  renderCommits(commits.slice(0, maxCommits));
+  renderCommits({
+    commits: commits.slice(0, maxCommits),
+    refs,
+  });
 }
 
 woop();

@@ -21,8 +21,9 @@ export async function logCustom(...args) {
 
 
 export async function logRaw(...args) {
-  const commandArguments = ['log', '--pretty=raw', ...args];
+  const commandArguments = ['log', '--pretty=raw', '--decorate=full', ...args];
+  // const commandArguments = ['log', '--pretty=raw', ...args];
   const commandOutput = await executeGitCommand(commandArguments);
-  const commits = parsers.parseLogRaw(commandOutput);
-  return commits;
+  const { commits, refs } = parsers.parseLogRaw(commandOutput);
+  return { commits, refs };
 }

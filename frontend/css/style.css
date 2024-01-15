@@ -1,3 +1,6 @@
+html, body {
+  font-family: sans-serif;
+}
 .commits {
   position: relative;
   --max-column: 1;
@@ -18,6 +21,14 @@
   top: 0;
   left: 0;
   transform: translateY(calc(var(--row) * var(--row-height)));
+}
+.commit .ref {
+  display: inline-block;
+  font-size: 70%;
+  border: 1px solid #000000;
+  border-radius: 3px;
+  padding: 2px 4px;
+  margin-right: 2px;
 }
 .commit .graph {
   --max-graph-width: 50vw;

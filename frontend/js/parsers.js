@@ -109,6 +109,7 @@ const LOG_RAW_PERSON_REGEX = /^(?<name>.+) <(?<email>.*)> (?<timestamp>.+) (?<ti
 
 export function parseLogRaw(commandOutput) {
   const commits = [];
+  const refs = {};
   // Git log in raw format is headers and message separated by two newlines.
   // Each commit is also separated by two newlines.
   const commitParts = commandOutput.split('\n\n');
@@ -125,7 +126,9 @@ export function parseLogRaw(commandOutput) {
       committerName,
       committerEmail,
       committerDate,
+      commitRefs,
     } = parseLogRawHeaders(headers);
+    Object.assign(refs, commitRefs);
     const {
       subject,
       messageBody,
@@ -145,7 +148,7 @@ export function parseLogRaw(commandOutput) {
       })
     );
   }
-  return commits;
+  return { commits, refs };
 }
 
 function parseLogRawHeaders(headerChunk) {
@@ -158,12 +161,15 @@ function parseLogRawHeaders(headerChunk) {
     committerName: undefined,
     committerEmail: undefined,
     committerDate: undefined,
+    commitRefs: {},
   };
   const headerLines = headerChunk.split('\n');
   for (const line of headerLines) {
     const [headerName, headerValue] = splitOnce(line, ' ');
     if (headerName === 'commit') {
-      headers.id = headerValue;
+      const [commitId, refsRaw] = splitOnce(headerValue, ' ');
+      headers.id = commitId;
+      headers.commitRefs = parseRefsFromDecorateFull(refsRaw, commitId);
     }
     else if (headerName === 'parent') {
       headers.parents.push(headerValue);
@@ -196,4 +202,47 @@ function parseLogRawMessage(messageChunk) {
   // Split at the first `\n\n` which git considers to be the separator between the subject and body.
   const [subject, messageBody] = splitOnce(message, '\n\n');
   return { subject, messageBody };
+}
+
+function parseRefsFromDecorateFull(refsRaw, commitId) {
+  const refs = {};
+  if ( ! refsRaw) {
+    return refs;
+  }
+  const refsRawSplit = (
+    refsRaw
+    // Remove leading `(` and trailing `)`
+    .slice(1, -1)
+    .split(', ')
+  );
+  for (const splitRef of refsRawSplit) {
+    let fullRefPath = splitRef;
+    if (splitRef.startsWith('HEAD -> ')) {
+      fullRefPath = splitRef.replace('HEAD -> ', '');
+      refs['HEAD'] = commitId;
+      // TODO: Store fullRefPath instead (symbolic ref)?
+    }
+    else if (splitRef.startsWith('tag: ')) {
+      fullRefPath = splitRef.replace('tag: ', '');
+    }
+    const { refType, refName } = parseFullRefPath(fullRefPath);
+    refs[fullRefPath] = commitId;
+    // TODO: Store more metadata?
+  }
+  return refs;
+}
+
+export function parseFullRefPath(fullRefPath) {
+  if (fullRefPath.startsWith('refs')) {
+    // Path format is refs/<type>/<path-to-ref>
+    // Most common types are `heads`, `tags` and `remotes`
+    const [refType, refName] = splitOnce(fullRefPath.split('refs/').pop(), '/');
+    return { refType, refName };
+  }
+  else {
+    return {
+      refType: null,
+      refName: fullRefPath,
+    };
+  }
 }
