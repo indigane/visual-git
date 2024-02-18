@@ -4,6 +4,9 @@
   "description": "Visual Git",
   "type": "module",
   "main": "index.js",
+  "dependencies": {
+    "ws": "file:./vendor/ws"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
