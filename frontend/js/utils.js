@@ -35,3 +35,24 @@ export function splitOnce(inputString, separator) {
     inputString.slice(firstIndexOfSeparator + separator.length),
   ];
 }
+
+
+export function elementEvent(element, eventName, eventData) {
+  element.dispatchEvent(
+    new CustomEvent(eventName, {
+      detail: eventData,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    })
+  );
+}
+
+
+export function documentEvent(eventName, eventData) {
+  elementEvent(
+    document.documentElement,
+    eventName,
+    eventData,
+  );
+}

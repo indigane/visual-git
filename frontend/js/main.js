@@ -1,3 +1,4 @@
+import './settings.js';
 import * as git from './git-commands.js';
 import { parseFullRefPath } from './parsers.js';
 import { asTextContent, requestIdlePromise } from './utils.js';
@@ -68,6 +69,10 @@ async function renderCommits({ commits, refs }) {
   //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
   //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
   const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
+
+  // Clear containers
+  commitsContainer.replaceChildren();
+  edgesContainer.replaceChildren();
 
   // Reverse mapping for refs
   const refsForCommitId = {};
@@ -304,38 +309,32 @@ async function renderCommits({ commits, refs }) {
 }
 
 
-async function woop() {
-  // const commits = await git.logCustom('--date-order', '--max-count=50000');
-  const { commits, refs } = await git.logRaw('--date-order', '--max-count=50000');
-  const maxCommits = 50000;
-  renderCommits({
-    commits: commits.slice(0, maxCommits),
-    refs,
-  });
+function main() {
+  const settings = document.querySelector('vg-settings');
+
+  getCommitsAndRender();
+  settings.addEventListener('setting-change', getCommitsAndRender);
+
+  async function getCommitsAndRender() {
+    const maxCommits = settings.get('maxCommits');
+    const branchVisibility = settings.get('branchVisibility');
+    const flags = [
+      '--date-order',
+      `--max-count=${maxCommits}`,
+    ];
+    if (branchVisibility === 'allRefs') {
+      flags.push('--all');
+    }
+    if (branchVisibility === 'allRefsHistory') {
+      flags.push('--all', '--reflog');
+    }
+    // const commits = await git.logCustom(...flags);
+    const { commits, refs } = await git.logRaw(...flags);
+    renderCommits({
+      commits: commits.slice(0, maxCommits),
+      refs,
+    });
+  }
 }
 
-woop();
-
-/*
-const bar = new Commit({
-  id: 'id',
-  parents: 'parents',
-  author: 'author',
-  authorDate: 'authorDate',
-  committer: 'committer',
-  committerDate: 'committerDate',
-});
-console.log(bar);
-
-const git = {
-  log: async function() {
-    //const commandArguments = ['log', '--all', '--oneline', '--reflog'];
-    const commandArguments = ['log', '--all', '--pretty=raw'];
-    const response = await fetch('', {
-      method: 'POST',
-      body: JSON.stringify(commandArguments),
-    });
-    const result = await response.text();
-  },
-};
-*/
+main();

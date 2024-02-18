@@ -1,6 +1,9 @@
 html, body {
   font-family: sans-serif;
 }
+.graph {
+  position: relative;
+}
 .commits {
   position: relative;
   --max-column: 1;
@@ -53,8 +56,8 @@ html, body {
 
 .edges {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 0px;
+  left: 0px;
   width: 32px;
   height: 32px;
   overflow: visible;

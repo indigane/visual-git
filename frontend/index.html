@@ -7,8 +7,27 @@
     <link href="css/style.css" rel="stylesheet">
   </head>
   <body>
-    <div class="commits"></div>
-    <svg class="edges"></svg>
+    <vg-settings>
+      <div>
+        Field of vision:
+        <label>
+          <input type="radio" name="branchVisibility" value="currentBranch" checked>
+          Current branch only
+        </label>
+        <label>
+          <input type="radio" name="branchVisibility" value="allRefs">
+          Other branches too
+        </label>
+        <label>
+          <input type="radio" name="branchVisibility" value="allRefsHistory">
+          EVERYTHING
+        </label>
+      </div>
+    </vg-settings>
+    <div class="graph">
+      <div class="commits"></div>
+      <svg class="edges"></svg>
+    </div>
     <script src="js/main.js" type="module"></script>
   </body>
 </html>
