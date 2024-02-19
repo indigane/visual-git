@@ -6,8 +6,10 @@ import { WebSocketServer } from './vendor/ws/wrapper.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import url from 'node:url';
 
-const STATIC_PATH = '../frontend/';
+const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+const STATIC_PATH = `${__dirname}/../frontend/`;
 
 const extensionToMimeType = {
   '.html': 'text/html',
