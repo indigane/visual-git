@@ -7,4 +7,4 @@ PATH_TO_NODE="$DIR/../runtime/node"
 
 PATH_TO_INDEX_JS="$DIR/../backend/index.js"
 
-"$PATH_TO_NODE" "$PATH_TO_INDEX_JS" "$@"
+nohup "$PATH_TO_NODE" "$PATH_TO_INDEX_JS" "$@" > /dev/null 2>&1 &
