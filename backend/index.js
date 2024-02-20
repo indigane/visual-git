@@ -1,13 +1,16 @@
+import child_process from 'node:child_process';
 
 //
 // Server
 //
-import { WebSocketServer } from './vendor/ws/wrapper.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import url from 'node:url';
+import { WebSocketServer } from './vendor/ws/wrapper.mjs';
 
-const STATIC_PATH = '../frontend/';
+const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+const STATIC_PATH = `${__dirname}/../frontend/`;
 
 const extensionToMimeType = {
   '.html': 'text/html',
@@ -35,8 +38,8 @@ const isValidPath = (() => {
 })();
 
 const server = http.createServer((req, res) => {
+  // Serve static files
   if (req.method === 'GET') {
-    // Serve static files
     const filePath = req.url === '/' ? 'index.html' : req.url;
     if ( ! isValidPath(filePath)) {
       res.statusCode = 404;
@@ -69,17 +72,87 @@ const server = http.createServer((req, res) => {
   }
 });
 
-server.listen(3000, () => {
-  console.log('Server listening on port 3000');
+const wss = new WebSocketServer({ server });
+wss.on('connection', (ws) => {
+  ws.on('message', async (message) => {
+    // Handle commands
+    try {
+      const result = await handleCommand(message);
+      ws.send(JSON.stringify({ result }));
+    } catch (error) {
+      ws.send(JSON.stringify({ error }));
+    }
+  });
+  // Heartbeat
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true });
 });
+// Heartbeat
+{
+  const heartbeatInterval = setInterval(function ping() {
+    wss.clients.forEach(function each(ws) {
+      if (ws.isAlive === false) {
+        ws.terminate();
+        return;
+      }
+      ws.isAlive = false;
+      ws.ping();
+    });
+    setTimeout(() => {
+      if (wss.clients.size === 0) {
+        // No open tabs remain. Close the server process.
+        process.exit();
+      }
+    }, 100);
+  }, 30000);
+  wss.on('close', function close() {
+    clearInterval(heartbeatInterval);
+  });
+}
+
+{
+  let port = process.env.PORT || 3000;
+  // Node server.listen has no concept of success, only error,
+  // so we wait a bit and assume success if there was no error.
+  let connectionSuccessTimer;
+  const waitForSuccess = () => {
+    clearTimeout(connectionSuccessTimer);
+    connectionSuccessTimer = setTimeout(() => {
+      console.log(`Server is listening on port ${port}`);
+      openUrlInBrowser(`http://localhost:${port}`);
+    }, 100);
+  };
+  wss.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      port += 1;
+      server.listen(port);
+      waitForSuccess();
+    } else {
+      clearTimeout(connectionSuccessTimer);
+      console.error(err);
+    }
+  });
+  server.listen(port);
+  waitForSuccess();
+}
+
+function openUrlInBrowser(url) {
+  let startCommand;
+  if (process.platform === 'darwin') {
+    startCommand = 'open';
+  } else if (process.platform === 'win32') {
+    startCommand = 'start';
+  } else {
+    startCommand = 'xdg-open';
+  }
+  child_process.exec(`${startCommand} ${url}`, { windowsHide: true });
+}
+
 
 
 //
 // Command handling
 //
-import { spawn } from 'node:child_process';
-
-// TODO: Where do we get repository path from? For now it is a command line argument, or current directory.
 let repositoryPath;
 if (process.argv[2]) {
   repositoryPath = path.join(process.argv[2], '.git');
@@ -117,7 +190,7 @@ function handleCommand(commandArgumentsJson) {
 
 function runCommand(executable, args) {
   return new Promise((resolve, reject) => {
-    const command = spawn(executable, args);
+    const command = child_process.spawn(executable, args);
     let result = '';
     let errorResult = '';
     command.stdout.on('data', (data) => {
@@ -172,6 +245,8 @@ function validateArguments(commandArguments) {
 }
 
 function makeArgumentsRegex(...regexArray) {
+  // Joins regexes into one regex like this: `(?:^regex1$|^regex2$|^regex3$)`
+  // In other words, argument must exactly match at least one regex in regexArray.
   return new RegExp(
     '(?:' + regexArray.map(regex => '^' + regex.source + '$').join('|') + ')'
   );

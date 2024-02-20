@@ -34,7 +34,7 @@ class Path {
     const lastNode = this.nodes.slice(-1)[0];
     let endIndex = lastNode.row;
     for (const parentNode of lastNode.parents) {
-      if (parentNode.row > endIndex) {
+      if (parentNode !== undefined && parentNode.row > endIndex) {
         endIndex = parentNode.row;
       }
     }
@@ -165,7 +165,10 @@ async function renderCommits({ commits, refs }) {
     const pathBPriority = pathB.mergeCount === 0 ? pathB.getPrimaryParentPath()?.mergeCount ?? pathB.mergeCount : pathB.mergeCount;
     //return pathBLength - pathALength;
     if (pathBPriority - pathAPriority === 0) {
-      return pathBLength - pathALength;
+      if (pathB.mergeCount - pathA.mergeCount === 0) {
+        return pathALength - pathBLength;
+      }
+      return pathB.mergeCount - pathA.mergeCount;
     }
     return pathBPriority - pathAPriority;
   });
@@ -310,6 +313,14 @@ async function renderCommits({ commits, refs }) {
 
 
 function main() {
+  const socket = new WebSocket(`ws://${window.location.host}`);
+  socket.addEventListener('open', (event) => {
+    console.log('websocket-open');
+  });
+  socket.addEventListener('message', (event) => {
+    console.log('websocket-message', event.data);
+  });
+
   const settings = document.querySelector('vg-settings');
 
   getCommitsAndRender();
