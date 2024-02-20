@@ -37,6 +37,17 @@ export function splitOnce(inputString, separator) {
 }
 
 
+export function debounce(func, waitMilliseconds) {
+  let timeout;
+  return function debouncedFunc(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => {
+      func.apply(this, args);
+    }, waitMilliseconds);
+  };
+}
+
+
 export function elementEvent(element, eventName, eventData) {
   element.dispatchEvent(
     new CustomEvent(eventName, {

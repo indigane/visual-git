@@ -1,7 +1,8 @@
 import './settings.js';
+import socket from './socket.js'
 import * as git from './git-commands.js';
 import { parseFullRefPath } from './parsers.js';
-import { asTextContent, requestIdlePromise } from './utils.js';
+import { asTextContent, debounce, requestIdlePromise } from './utils.js';
 
 
 class Path {
@@ -313,18 +314,12 @@ async function renderCommits({ commits, refs }) {
 
 
 function main() {
-  const socket = new WebSocket(`ws://${window.location.host}`);
-  socket.addEventListener('open', (event) => {
-    console.log('websocket-open');
-  });
-  socket.addEventListener('message', (event) => {
-    console.log('websocket-message', event.data);
-  });
-
   const settings = document.querySelector('vg-settings');
 
   getCommitsAndRender();
   settings.addEventListener('setting-change', getCommitsAndRender);
+
+  socket.addEventListener('message', debounce(getCommitsAndRender, 50));
 
   async function getCommitsAndRender() {
     const maxCommits = settings.get('maxCommits');

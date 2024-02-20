@@ -7,7 +7,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
-import { WebSocketServer } from './vendor/ws/wrapper.mjs';
+import { WebSocket, WebSocketServer } from './vendor/ws/wrapper.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const STATIC_PATH = `${__dirname}/../frontend/`;
@@ -74,15 +74,6 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ server });
 wss.on('connection', (ws) => {
-  ws.on('message', async (message) => {
-    // Handle commands
-    try {
-      const result = await handleCommand(message);
-      ws.send(JSON.stringify({ result }));
-    } catch (error) {
-      ws.send(JSON.stringify({ error }));
-    }
-  });
   // Heartbeat
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true });
@@ -148,19 +139,23 @@ function openUrlInBrowser(url) {
   child_process.exec(`${startCommand} ${url}`, { windowsHide: true });
 }
 
+function websocketBroadcast(data) {
+  wss.clients.forEach(function each(client) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(data);
+    }
+  });
+}
 
 
 //
 // Command handling
 //
-let repositoryPath;
-if (process.argv[2]) {
-  repositoryPath = path.join(process.argv[2], '.git');
-}
-else {
-  // Ask git for --git-dir. This is mostly an example, as we could also omit --git-dir in this case.
-  repositoryPath = (await runCommand('git', ['rev-parse', '--absolute-git-dir'])).trim();
-}
+
+// Can be undefined, which defaults to current working directory.
+const targetDirectory = process.argv[2];
+// Path to .git directory.
+const repositoryPath = (await runCommand('git', ['rev-parse', '--absolute-git-dir'], { cwd: targetDirectory })).trim();
 
 function handleCommand(commandArgumentsJson) {
   return new Promise((resolve, reject) => {
@@ -188,9 +183,9 @@ function handleCommand(commandArgumentsJson) {
   });
 }
 
-function runCommand(executable, args) {
+function runCommand(executable, args, options) {
   return new Promise((resolve, reject) => {
-    const command = child_process.spawn(executable, args);
+    const command = child_process.spawn(executable, args, options);
     let result = '';
     let errorResult = '';
     command.stdout.on('data', (data) => {
@@ -251,3 +246,14 @@ function makeArgumentsRegex(...regexArray) {
     '(?:' + regexArray.map(regex => '^' + regex.source + '$').join('|') + ')'
   );
 }
+
+
+//
+// Monitor .git
+//
+fs.watch(path.join(repositoryPath, 'HEAD'), function handleGitChange(eventType, filename) {
+  websocketBroadcast('HEAD');
+});
+fs.watch(path.join(repositoryPath, 'refs'), { recursive: true }, function handleGitChange(eventType, filename) {
+  websocketBroadcast('refs:' + filename);
+});
