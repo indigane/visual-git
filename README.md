@@ -7,7 +7,7 @@
   ```sh
   git clone https://gitlab.com/indigane/visual-git.git
   ```
-- Download node binary and place it in `runtime/`. Node 20 recommended.<br>
+- [Download node binary](https://nodejs.org/en/download) and place it in `runtime/`. Node 20 recommended.<br>
   _For example:_
   ```sh
   cd visual-git
