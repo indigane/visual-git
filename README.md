@@ -13,7 +13,7 @@
   cd visual-git
   curl -L https://nodejs.org/dist/v20.11.1/node-v20.11.1-linux-x64.tar.xz | tar -Jxv --strip-components=2 -C runtime -f - node-v20.11.1-linux-x64/bin/node
   ```
-- Add `visual-git/bin/` to PATH:<br>
+- If you want to use `vg` command, add `visual-git/bin/` to PATH:<br>
   _For example temporarily:_
   ```sh
   cd visual-git
