@@ -251,9 +251,109 @@ function makeArgumentsRegex(...regexArray) {
 //
 // Monitor .git
 //
-fs.watch(path.join(repositoryPath, 'HEAD'), function handleGitChange(eventType, filename) {
-  websocketBroadcast('HEAD');
-});
-fs.watch(path.join(repositoryPath, 'refs'), { recursive: true }, function handleGitChange(eventType, filename) {
-  websocketBroadcast('refs:' + filename);
-});
+
+{
+  const handleHEADChange = function(eventType, filename) {
+    websocketBroadcast('HEAD');
+  };
+  const handleRefsChange = function(eventType, filename) {
+    websocketBroadcast('refs:' + filename);
+  };
+
+  if (process.platform === 'win32') {
+    fs.watch(path.join(repositoryPath, 'HEAD'), {}, handleHEADChange);
+    fs.watch(path.join(repositoryPath, 'refs'), { recursive: true }, handleRefsChange);
+  }
+  else {
+    // Workarounds for Linux and possibly macOS (untested as of writing).
+
+    const customWatchFile = function(targetFilename, options, listener) {
+      const wrappedListener = (eventType, eventFilename) => {
+        listener(eventType, eventFilename);
+        if (eventType === 'rename') {
+          watcher.close();
+          try {
+            watcher = fs.watch(targetFilename, options, wrappedListener);
+          } catch(error) {
+            if (error.code === 'ENOENT') {
+              watcher.emit('remove');
+            }
+          }
+        }
+      };
+      let watcher = fs.watch(targetFilename, options, wrappedListener);
+      return { watcher };
+    };
+    const getAllFiles = function(dirPath, arrayOfFiles) {
+      const files = fs.readdirSync(dirPath);
+      arrayOfFiles = arrayOfFiles || [];
+      files.forEach(function handleFile(file) {
+        const filePath = path.join(dirPath, file);
+        const fileStat = fs.statSync(filePath);
+        if (fileStat.isDirectory()) {
+          arrayOfFiles = getAllFiles(filePath, arrayOfFiles);
+        } else {
+          arrayOfFiles.push({
+            path: filePath,
+            modifiedTime: fileStat.mtime,
+          });
+        }
+      });
+      return arrayOfFiles;
+    };
+
+    // Speculation:
+    // Git causes a lot of renames for files such as HEAD.
+    // Renames cause the watcher to emit once, and then never again.
+    // Closing and restarting the watcher seems to fix this.
+    customWatchFile(path.join(repositoryPath, 'HEAD'), {}, handleHEADChange);
+
+    // As of writing, `recursive: true` is a hack on Linux, due to the underlying libuv not supporting it.
+    // This hack is a lot slower than `fs.watch` normally is.
+    // As a workaround for the slowness we assign separate watchers for each file, up to a limit,
+    // and update those watchers based on `recursive: true`.
+    const MAX_REF_WATCHERS = 100;
+    const refsPath = path.join(repositoryPath, 'refs');
+    const refFiles = getAllFiles(path.join(repositoryPath, 'refs'));
+    const refFilesDescendingDateSorted = refFiles.sort((a, b) => b.modifiedTime - a.modifiedTime);
+    const watchersByPath = {};
+    const addWatcherByPath = (filePath) => {
+      watchersByPath[filePath] = customWatchFile(filePath, {}, (eventType, filename) => {
+        // For compatibility with `recursive: true` call the listener with relative path + filename.
+        const relativeFilePath = filePath.replace(refsPath + path.sep, '');
+        handleRefsChange(eventType, relativeFilePath);
+      });
+      watchersByPath[filePath].watcher.on('remove', () => {
+        watchersByPath[filePath] = undefined;
+      });
+    };
+
+    // Initial faster file watchers
+    for (const { path: filePath } of refFilesDescendingDateSorted.slice(0, MAX_REF_WATCHERS)) {
+      addWatcherByPath(filePath);
+    }
+
+    // Slower recursive watcher as a catch-all
+    fs.watch(refsPath, { recursive: true }, function (eventType, filename) {
+      const filePath = path.join(refsPath, filename);
+      if (watchersByPath[filePath] !== undefined && fs.existsSync(filePath)) {
+        // Already watching, avoid duplicate events.
+        return;
+      }
+      else {
+        // NOTE: There is a risk that the user somehow receives a lot of refs, causing performance issues.
+        try {
+          addWatcherByPath(filePath);
+        } catch(error) {
+          if (error.code === 'ENOENT') {
+            watchersByPath[filePath] = undefined;
+            return;
+          }
+        }
+        // Also trigger the listener since the new watcher did not see this event.
+        const relativeFilePath = filePath.replace(refsPath + path.sep, '');
+        handleRefsChange(eventType, relativeFilePath);
+      }
+    });
+  }
+}
