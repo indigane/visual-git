@@ -69,6 +69,7 @@ async function renderCommits({ commits, refs }) {
   //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
   //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
   const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
+  const maxRow = commits.length - 1;
 
   // Clear container
   commitsContainer.replaceChildren();
@@ -248,8 +249,14 @@ async function renderCommits({ commits, refs }) {
         const points = [];
         let strokeColor = colors[0];
         if (parentNode === undefined) {
-          // TODO: Handle situation where parent commit has not been parsed.
-          // There should be an edge drawn without a destination.
+          // Parent has not been parsed yet. Draw a simple line through the bottom of the graph.
+          const startX = node.path.columnIndex;
+          const startY = 0;
+          points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
+          const endX = node.path.columnIndex;
+          const endY = maxRow + 1 - node.row;
+          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          strokeColor = colors[node.path.columnIndex % colors.length];
         }
         else if (node.path === parentNode.path) {
           // Edge is within the same path. Draw a simple line.
