@@ -14,6 +14,8 @@ html, body {
   --column: 0;
   --column-width: 2em;
   --row-height: 2em;
+  --max-graph-width: 50vw;
+  --graph-width: min(calc(var(--column-width) * var(--max-column)), var(--max-graph-width));
   contain: size layout style;
   display: flex;
   flex-direction: row;
@@ -24,6 +26,9 @@ html, body {
   top: 0;
   left: 0;
   transform: translateY(calc(var(--row) * var(--row-height)));
+  transition-property: transform;
+  transition-duration: 1s;
+  transition-timing-function: ease-in-out;
 }
 .commit .ref {
   display: inline-block;
@@ -34,8 +39,6 @@ html, body {
   margin-right: 2px;
 }
 .commit .graph {
-  --max-graph-width: 50vw;
-  --graph-width: min(calc(var(--column-width) * var(--max-column)), var(--max-graph-width));
   width: var(--graph-width);
   min-width: var(--graph-width);
   height: var(--row-height);
@@ -52,10 +55,22 @@ html, body {
   cx: calc(var(--size) / 2 + var(--offset-left));
   cy: calc(var(--size) / 2);
   r: calc(var(--size) / 10);
+  transition-property: fill, cx, cy;
+  transition-duration: 1s;
+  transition-timing-function: ease-in-out;
 }
 .commit .graph .edge {
   stroke: black;
   stroke-width: 2px;
   fill: transparent;
   stroke-dashoffset: -5px;
+  transition: stroke 1s ease-in-out;
+}
+.commit .message {
+  position: absolute;
+  left: 0;
+  transform: translateX(var(--graph-width));
+  transition-property: transform;
+  transition-duration: 1s;
+  transition-timing-function: ease-in-out;
 }

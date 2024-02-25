@@ -2,7 +2,7 @@ import './settings.js';
 import socket from './socket.js'
 import * as git from './git-commands.js';
 import { parseFullRefPath } from './parsers.js';
-import { asTextContent, debounce, requestIdlePromise } from './utils.js';
+import { animate, asTextContent, debounce, requestIdlePromise } from './utils.js';
 
 
 class Path {
@@ -64,15 +64,16 @@ class Node {
 }
 
 
+const commitElementsByCommitId = {};
+
+
 async function renderCommits({ commits, refs }) {
   const commitsContainer = document.querySelector('.commits');
   //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
   //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
   const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
   const maxRow = commits.length - 1;
-
-  // Clear container
-  commitsContainer.replaceChildren();
+  const commitElementsToKeep = [];
 
   // Reverse mapping for refs
   const refsForCommitId = {};
@@ -237,12 +238,13 @@ async function renderCommits({ commits, refs }) {
     function renderRefs(refsToRender) {
       return refsToRender.map(renderRef).join('');
     }
-    function renderEdges() {
+    function getEdges() {
       const rowHeight = 32;
       const columnWidth = 32;
       const xOffset = columnWidth / 2;
       const yOffset = rowHeight / 2;
       const cornerOffset = rowHeight / 3;
+      const edges = [];
       for (const [parentIndex, parentId] of commit.parents.entries()) {
         const isPrimaryParent = parentIndex === 0;
         const parentNode = nodeForCommitId.get(parentId);
@@ -294,28 +296,113 @@ async function renderCommits({ commits, refs }) {
           points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
           strokeColor = colors[parentNode.path.columnIndex % colors.length];
         }
-        return `<polyline class="edge" points="${[points].join(' ')}" style="stroke: ${strokeColor};">`;
+        edges.push({
+          pointsString: [points].join(' '),
+          strokeColor,
+        });
       }
+      return edges;
     }
     // Node
     const node = nodeForCommitId.get(commit.id);
     const nodeRefs = refsForCommitId[commit.id] ?? [];
     const color = colors[node.path.columnIndex % colors.length];
-    commitsContainer.insertAdjacentHTML('beforeend', `
-    <div class="commit" style="--row: ${node.row}; --column: ${node.path.columnIndex};" data-id="${node.commit.id}">
-      <div class="graph" style="color: ${color};">
-        <svg>
-          <circle></circle>
-          ${renderEdges()}
-        </svg>
+    const edges = getEdges();
+    let commitElement = commitElementsByCommitId[commit.id];
+    if (commitElement === undefined) {
+      commitsContainer.insertAdjacentHTML('beforeend', `
+      <div class="commit" style="--row: ${node.row}; --column: ${node.path.columnIndex};" data-commit-id="${node.commit.id}">
+        <div class="graph" style="color: ${color};">
+          <svg>
+            <circle></circle>
+            ${edges.map(edge =>
+              `<polyline class="edge" points="${edge.pointsString}" style="stroke: ${edge.strokeColor};" />`
+            ).join('')}
+          </svg>
+        </div>
+        <div class="message">${renderRefs(nodeRefs)} ${asTextContent(node.commit.subject)}</div>
       </div>
-      <div class="message">${renderRefs(nodeRefs)} ${asTextContent(node.commit.subject)}</div>
-    </div>
-    `.trim());
-    // Setting stroke-dasharray to polylineLength allows a gap using stroke-dashoffset.
-    const edgeElement = commitsContainer.lastElementChild.querySelector('.edge');
-    const polylineLength = edgeElement.getTotalLength();
-    edgeElement.setAttribute('stroke-dasharray', polylineLength);
+      `.trim());
+      commitElement = commitsContainer.lastElementChild;
+      commitElementsByCommitId[commit.id] = commitElement;
+      for (const edgeElement of commitElement.querySelectorAll('.edge')) {
+        // Setting stroke-dasharray to polylineLength allows a gap using stroke-dashoffset.
+        const polylineLength = edgeElement.getTotalLength();
+        edgeElement.setAttribute('stroke-dasharray', polylineLength);
+      }
+      animate(commitElement,
+        [
+          {opacity: '0'},
+          {opacity: '1'},
+        ],
+        {delay: 500, duration: 500, fill: 'backwards'},
+      );
+      animate(commitElement.querySelector('circle'),
+        [
+          {r: '0'},
+          {r: 'calc(var(--size) / 10)'},
+        ],
+        {delay: 500, duration: 500, fill: 'backwards'},
+      );
+      for (const edgeElement of commitElement.querySelectorAll('polyline')) {
+        animate(edgeElement,
+          [
+            {strokeWidth: '0'},
+            {strokeWidth: '2px'},
+          ],
+          {delay: 500, duration: 500, fill: 'backwards'},
+        );
+      }
+    }
+    else {
+      commitElement.style.setProperty('--row', node.row);
+      commitElement.style.setProperty('--column', node.path.columnIndex);
+      commitElement.querySelector('.graph').style.color = color;
+      // Edge animation
+      const edgeElements = commitElement.querySelectorAll('.edge');
+      for (const [index, edge] of edges.entries()) {
+        const edgeElement = edgeElements[index];
+        const oldPointsString = edgeElement.getAttribute('points');
+        const oldPolylineLength = edgeElement.getAttribute('stroke-dasharray');
+        edgeElement.setAttribute('points', edge.pointsString);
+        const polylineLength = edgeElement.getTotalLength();
+        edgeElement.setAttribute('stroke-dasharray', polylineLength);
+        edgeElement.style.stroke = edge.strokeColor;
+        edgeElement.replaceChildren();
+        edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="points" values="${oldPointsString};${edge.pointsString}" dur="1s" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
+        edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="stroke-dasharray" values="${oldPolylineLength};${polylineLength}" dur="1s" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
+      }
+      commitElement.querySelector('svg').setCurrentTime(0);
+    }
+    commitElementsToKeep.push(commitElement);
+  }
+  for (const [commitId, commitElement] of Object.entries(commitElementsByCommitId)) {
+    if ( ! commitElementsToKeep.includes(commitElement)) {
+      animate(commitElement,
+        [
+          {opacity: '1'},
+          {opacity: '0'},
+        ],
+        {duration: 500},
+      ).finished.then(() => commitElement.remove());
+      animate(commitElement.querySelector('circle'),
+        [
+          {r: 'calc(var(--size) / 10)'},
+          {r: '0'},
+        ],
+        {duration: 500},
+      );
+      for (const edgeElement of commitElement.querySelectorAll('polyline')) {
+        animate(edgeElement,
+          [
+            {strokeWidth: '2px'},
+            {strokeWidth: '0'},
+          ],
+          {duration: 500},
+        );
+      }
+      delete commitElementsByCommitId[commitId];
+    }
   }
 }
 
