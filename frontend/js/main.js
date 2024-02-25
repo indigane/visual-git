@@ -66,14 +66,12 @@ class Node {
 
 async function renderCommits({ commits, refs }) {
   const commitsContainer = document.querySelector('.commits');
-  const edgesContainer = document.querySelector('.edges');
   //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
   //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
   const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
 
-  // Clear containers
+  // Clear container
   commitsContainer.replaceChildren();
-  edgesContainer.replaceChildren();
 
   // Reverse mapping for refs
   const refsForCommitId = {};
@@ -238,6 +236,60 @@ async function renderCommits({ commits, refs }) {
     function renderRefs(refsToRender) {
       return refsToRender.map(renderRef).join('');
     }
+    function renderEdges() {
+      const rowHeight = 32;
+      const columnWidth = 32;
+      const xOffset = columnWidth / 2;
+      const yOffset = rowHeight / 2;
+      const cornerOffset = rowHeight / 3;
+      for (const [parentIndex, parentId] of commit.parents.entries()) {
+        const isPrimaryParent = parentIndex === 0;
+        const parentNode = nodeForCommitId.get(parentId);
+        const points = [];
+        let strokeColor = colors[0];
+        if (parentNode === undefined) {
+          // TODO: Handle situation where parent commit has not been parsed.
+          // There should be an edge drawn without a destination.
+        }
+        else if (node.path === parentNode.path) {
+          // Edge is within the same path. Draw a simple line.
+          const startX = node.path.columnIndex;
+          const startY = 0;
+          points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
+          const endX = parentNode.path.columnIndex;
+          const endY = parentNode.row - node.row;
+          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          strokeColor = colors[node.path.columnIndex % colors.length];
+        }
+        else if (isPrimaryParent) {
+          // Edge is converging. Draw a line with a corner.
+          const startX = node.path.columnIndex;
+          const startY = 0;
+          points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
+          const cornerX = node.path.columnIndex;
+          const cornerY = parentNode.row - node.row;
+          points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight + yOffset - cornerOffset}`);
+          const endX = parentNode.path.columnIndex;
+          const endY = parentNode.row - node.row;
+          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          strokeColor = colors[node.path.columnIndex % colors.length];
+        }
+        else {
+          // Edge is diverging. Draw a line with a corner.
+          const startX = node.path.columnIndex;
+          const startY = 0;
+          points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
+          const cornerX = parentNode.path.columnIndex;
+          const cornerY = 0;
+          points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight + yOffset + cornerOffset}`);
+          const endX = parentNode.path.columnIndex;
+          const endY = parentNode.row - node.row;
+          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          strokeColor = colors[parentNode.path.columnIndex % colors.length];
+        }
+        return `<polyline class="edge" points="${[points].join(' ')}" style="stroke: ${strokeColor};">`;
+      }
+    }
     // Node
     const node = nodeForCommitId.get(commit.id);
     const nodeRefs = refsForCommitId[commit.id] ?? [];
@@ -247,68 +299,16 @@ async function renderCommits({ commits, refs }) {
       <div class="graph" style="color: ${color};">
         <svg>
           <circle></circle>
+          ${renderEdges()}
         </svg>
       </div>
       <div class="message">${renderRefs(nodeRefs)} ${asTextContent(node.commit.subject)}</div>
     </div>
     `.trim());
-    // Edges
-    const rowHeight = 32;
-    const columnWidth = 32;
-    const xOffset = columnWidth / 2;
-    const yOffset = rowHeight / 2;
-    const cornerOffset = rowHeight / 3;
-    for (const [parentIndex, parentId] of commit.parents.entries()) {
-      const isPrimaryParent = parentIndex === 0;
-      const parentNode = nodeForCommitId.get(parentId);
-      const edgeElement = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-      const points = [];
-      if (parentNode === undefined) {
-        // TODO: Handle situation where parent commit has not been parsed.
-        // There should be an edge drawn without a destination.
-      }
-      else if (node.path === parentNode.path) {
-        // Edge is within the same path. Draw a simple line.
-        const startX = node.path.columnIndex;
-        const startY = node.row;
-        points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
-        const endX = parentNode.path.columnIndex;
-        const endY = parentNode.row;
-        points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
-        edgeElement.style.stroke = colors[node.path.columnIndex % colors.length];
-      }
-      else if (isPrimaryParent) {
-        // Edge is converging. Draw a line with a corner.
-        const startX = node.path.columnIndex;
-        const startY = node.row;
-        points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
-        const cornerX = node.path.columnIndex;
-        const cornerY = parentNode.row;
-        points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight + yOffset - cornerOffset}`);
-        const endX = parentNode.path.columnIndex;
-        const endY = parentNode.row;
-        points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
-        edgeElement.style.stroke = colors[node.path.columnIndex % colors.length];
-      }
-      else {
-        // Edge is diverging. Draw a line with a corner.
-        const startX = node.path.columnIndex;
-        const startY = node.row;
-        points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
-        const cornerX = parentNode.path.columnIndex;
-        const cornerY = node.row;
-        points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight + yOffset + cornerOffset}`);
-        const endX = parentNode.path.columnIndex;
-        const endY = parentNode.row;
-        points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
-        edgeElement.style.stroke = colors[parentNode.path.columnIndex % colors.length];
-      }
-      edgesContainer.appendChild(edgeElement);
-      edgeElement.setAttribute('points', [points].join(' '));
-      // Gap
-      const polylineLength = edgeElement.getTotalLength();
-      edgeElement.setAttribute('stroke-dasharray', polylineLength);
-    }
+    // Setting stroke-dasharray to polylineLength allows a gap using stroke-dashoffset.
+    const edgeElement = commitsContainer.lastElementChild.querySelector('.edge');
+    const polylineLength = edgeElement.getTotalLength();
+    edgeElement.setAttribute('stroke-dasharray', polylineLength);
   }
 }
 

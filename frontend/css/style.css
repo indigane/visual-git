@@ -1,7 +1,7 @@
 html, body {
   font-family: sans-serif;
 }
-.graph {
+.graph-container {
   position: relative;
 }
 .commits {
@@ -53,17 +53,7 @@ html, body {
   cy: calc(var(--size) / 2);
   r: calc(var(--size) / 10);
 }
-
-.edges {
-  position: absolute;
-  top: 0px;
-  left: 0px;
-  width: 32px;
-  height: 32px;
-  overflow: visible;
-  z-index: 1;
-}
-.edges polyline {
+.commit .graph .edge {
   stroke: black;
   stroke-width: 2px;
   fill: transparent;
