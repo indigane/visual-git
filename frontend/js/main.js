@@ -258,6 +258,8 @@ async function renderCommits({ commits, refs }) {
           const endX = node.path.columnIndex;
           const endY = maxRow + 1 - node.row;
           points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          // Duplicate the end point for animations as they require a consistent number of points to transition.
+          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
           strokeColor = colors[node.path.columnIndex % colors.length];
         }
         else if (node.path === parentNode.path) {
@@ -267,6 +269,8 @@ async function renderCommits({ commits, refs }) {
           points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
           const endX = parentNode.path.columnIndex;
           const endY = parentNode.row - node.row;
+          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          // Duplicate the end point for animations as they require a consistent number of points to transition.
           points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
           strokeColor = colors[node.path.columnIndex % colors.length];
         }
@@ -311,8 +315,8 @@ async function renderCommits({ commits, refs }) {
     let commitElement = commitElementsByCommitId[commit.id];
     if (commitElement === undefined) {
       commitsContainer.insertAdjacentHTML('beforeend', `
-      <div class="commit" style="--row: ${node.row}; --column: ${node.path.columnIndex};" data-commit-id="${node.commit.id}">
-        <div class="graph" style="color: ${color};">
+      <div class="commit" style="--row: ${node.row}; --column: ${node.path.columnIndex}; --color: ${color};" data-commit-id="${node.commit.id}">
+        <div class="graph">
           <svg>
             <circle></circle>
             ${edges.map(edge =>
@@ -357,7 +361,7 @@ async function renderCommits({ commits, refs }) {
     else {
       commitElement.style.setProperty('--row', node.row);
       commitElement.style.setProperty('--column', node.path.columnIndex);
-      commitElement.querySelector('.graph').style.color = color;
+      commitElement.style.setProperty('--color', color);
       // Edge animation
       const edgeElements = commitElement.querySelectorAll('.edge');
       for (const [index, edge] of edges.entries()) {
@@ -372,7 +376,15 @@ async function renderCommits({ commits, refs }) {
         edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="points" values="${oldPointsString};${edge.pointsString}" dur="1s" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
         edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="stroke-dasharray" values="${oldPolylineLength};${polylineLength}" dur="1s" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
       }
-      commitElement.querySelector('svg').setCurrentTime(0);
+      // Edge animation timing
+      const svgElement = commitElement.querySelector('svg');
+      const syncSVGAnimationToCSSTransition = () => {
+        svgElement.unpauseAnimations();
+        commitElement.removeEventListener('transitionstart', syncSVGAnimationToCSSTransition);
+      };
+      svgElement.pauseAnimations();
+      svgElement.setCurrentTime(0);
+      commitElement.addEventListener('transitionstart', syncSVGAnimationToCSSTransition);
     }
     commitElementsToKeep.push(commitElement);
   }
