@@ -27,7 +27,7 @@ html, body {
   left: 0;
   transform: translateY(calc(var(--row) * var(--row-height)));
   transition-property: transform;
-  transition-duration: 1s;
+  transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
   z-index: var(--row);
 }
@@ -52,26 +52,28 @@ html, body {
   overflow: visible;
 }
 .commit .graph circle {
+  --radius: calc(var(--size) / 10);
   fill: var(--color, currentColor);
   cx: calc(var(--size) / 2 + var(--offset-left));
   cy: calc(var(--size) / 2);
-  r: calc(var(--size) / 10);
+  r: var(--radius);
   transition-property: fill, cx, cy;
-  transition-duration: 1s;
+  transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
 }
 .commit .graph .edge {
+  --stroke-width: 2px;
   stroke: black;
-  stroke-width: 2px;
+  stroke-width: var(--stroke-width);
   fill: transparent;
   stroke-dashoffset: -5px;
-  transition: stroke 1s ease-in-out;
+  transition: stroke var(--transition-duration, 0) ease-in-out;
 }
 .commit .message {
   position: absolute;
   left: 0;
   transform: translateX(var(--graph-width));
   transition-property: transform;
-  transition-duration: 1s;
+  transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
 }

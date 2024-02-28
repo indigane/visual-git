@@ -72,6 +72,7 @@ async function renderCommits({ commits, refs }) {
   //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
   //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
   const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
+  const redrawTransitionDurationMs = 1000;
   const maxRow = commits.length - 1;
   const commitElementsToKeep = [];
 
@@ -315,7 +316,7 @@ async function renderCommits({ commits, refs }) {
     let commitElement = commitElementsByCommitId[commit.id];
     if (commitElement === undefined) {
       commitsContainer.insertAdjacentHTML('beforeend', `
-      <div class="commit" style="--row: ${node.row}; --column: ${node.path.columnIndex}; --color: ${color};" data-commit-id="${node.commit.id}">
+      <div class="commit" style="--row: ${node.row}; --column: ${node.path.columnIndex}; --color: ${color}; --transition-duration: ${redrawTransitionDurationMs}ms;" data-commit-id="${node.commit.id}">
         <div class="graph">
           <svg>
             <circle></circle>
@@ -334,47 +335,40 @@ async function renderCommits({ commits, refs }) {
         const polylineLength = edgeElement.getTotalLength();
         edgeElement.setAttribute('stroke-dasharray', polylineLength);
       }
-      animate(commitElement,
-        [
-          {opacity: '0'},
-          {opacity: '1'},
-        ],
-        {delay: 500, duration: 500, fill: 'backwards'},
-      );
-      animate(commitElement.querySelector('circle'),
-        [
-          {r: '0'},
-          {r: 'calc(var(--size) / 10)'},
-        ],
-        {delay: 500, duration: 500, fill: 'backwards'},
-      );
-      for (const edgeElement of commitElement.querySelectorAll('polyline')) {
-        animate(edgeElement,
-          [
-            {strokeWidth: '0'},
-            {strokeWidth: '2px'},
-          ],
-          {delay: 500, duration: 500, fill: 'backwards'},
-        );
-      }
+      animateCommitEnter(commitElement);
     }
     else {
+      commitElement.style.setProperty('--transition-duration', redrawTransitionDurationMs + 'ms');
       commitElement.style.setProperty('--row', node.row);
       commitElement.style.setProperty('--column', node.path.columnIndex);
       commitElement.style.setProperty('--color', color);
       // Edge animation
+      function calculatePointsStringLength(pointsString) {
+        const pointsArray = pointsString.split(',').map(Number);
+        const distanceBetweenPoints = (x1, y1, x2, y2) => {
+          return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        };
+        let totalLength = 0;
+        for (let i = 0; i < pointsArray.length - 2; i += 2) {
+          totalLength += distanceBetweenPoints(pointsArray[i], pointsArray[i + 1], pointsArray[i + 2], pointsArray[i + 3]);
+        }
+        return totalLength;
+      }
       const edgeElements = commitElement.querySelectorAll('.edge');
       for (const [index, edge] of edges.entries()) {
         const edgeElement = edgeElements[index];
         const oldPointsString = edgeElement.getAttribute('points');
         const oldPolylineLength = edgeElement.getAttribute('stroke-dasharray');
+        // Remove existing animations
+        edgeElement.replaceChildren();
         edgeElement.setAttribute('points', edge.pointsString);
-        const polylineLength = edgeElement.getTotalLength();
+        // Calculate polylineLength instead of calling Polyline.getTotalLength()
+        // to fix issues when getTotalLength is called during animation.
+        const polylineLength = calculatePointsStringLength(edge.pointsString);
         edgeElement.setAttribute('stroke-dasharray', polylineLength);
         edgeElement.style.stroke = edge.strokeColor;
-        edgeElement.replaceChildren();
-        edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="points" values="${oldPointsString};${edge.pointsString}" dur="1s" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
-        edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="stroke-dasharray" values="${oldPolylineLength};${polylineLength}" dur="1s" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
+        edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="points" values="${oldPointsString};${edge.pointsString}" dur="${redrawTransitionDurationMs}ms" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
+        edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="stroke-dasharray" values="${oldPolylineLength};${polylineLength}" dur="${redrawTransitionDurationMs}ms" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
       }
       // Edge animation timing
       const svgElement = commitElement.querySelector('svg');
@@ -390,31 +384,65 @@ async function renderCommits({ commits, refs }) {
   }
   for (const [commitId, commitElement] of Object.entries(commitElementsByCommitId)) {
     if ( ! commitElementsToKeep.includes(commitElement)) {
-      animate(commitElement,
-        [
-          {opacity: '1'},
-          {opacity: '0'},
-        ],
-        {duration: 500},
-      ).finished.then(() => commitElement.remove());
-      animate(commitElement.querySelector('circle'),
-        [
-          {r: 'calc(var(--size) / 10)'},
-          {r: '0'},
-        ],
-        {duration: 500},
-      );
-      for (const edgeElement of commitElement.querySelectorAll('polyline')) {
-        animate(edgeElement,
-          [
-            {strokeWidth: '2px'},
-            {strokeWidth: '0'},
-          ],
-          {duration: 500},
-        );
-      }
+      animateCommitLeave(commitElement).then(() => commitElement.remove());
       delete commitElementsByCommitId[commitId];
     }
+  }
+  function animateCommitEnter(commitElement) {
+    // Half duration so that leaving elements are hidden before entering elements appear.
+    const halfDuration = redrawTransitionDurationMs / 2;
+    const animation = animate(commitElement,
+      [
+        {opacity: '0'},
+        {opacity: '1'},
+      ],
+      {delay: halfDuration, duration: halfDuration, fill: 'backwards'},
+    );
+    animate(commitElement.querySelector('circle'),
+      [
+        {r: '0'},
+        {r: 'var(--radius)'},
+      ],
+      {delay: halfDuration, duration: halfDuration, fill: 'backwards'},
+    );
+    for (const edgeElement of commitElement.querySelectorAll('polyline')) {
+      animate(edgeElement,
+        [
+          {strokeWidth: '0'},
+          {strokeWidth: 'var(--stroke-width)'},
+        ],
+        {delay: halfDuration, duration: halfDuration, fill: 'backwards'},
+      );
+    }
+    return animation.finished;
+  }
+  function animateCommitLeave(commitElement) {
+    // Half duration so that leaving elements are hidden before entering elements appear.
+    const halfDuration = redrawTransitionDurationMs / 2;
+    const animation = animate(commitElement,
+      [
+        {opacity: '1'},
+        {opacity: '0'},
+      ],
+      {duration: halfDuration},
+    );
+    animate(commitElement.querySelector('circle'),
+      [
+        {r: 'var(--radius)'},
+        {r: '0'},
+      ],
+      {duration: halfDuration},
+    );
+    for (const edgeElement of commitElement.querySelectorAll('polyline')) {
+      animate(edgeElement,
+        [
+          {strokeWidth: 'var(--stroke-width)'},
+          {strokeWidth: '0'},
+        ],
+        {duration: halfDuration},
+      );
+    }
+    return animation.finished;
   }
 }
 
