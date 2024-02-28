@@ -1,7 +1,7 @@
 import './settings.js';
 import socket from './socket.js'
 import * as git from './git-commands.js';
-import { animateCommitEnter, animateEdgesTransition, animateCommitLeave } from './animations.js';
+import { animateCommitEnter, animateEdgesTransition, animateCommitLeave, calculatePointsStringLength } from './animations.js';
 import { parseFullRefPath } from './parsers.js';
 import { asTextContent, debounce, requestIdlePromise } from './utils.js';
 
@@ -328,7 +328,7 @@ async function renderCommits({ commits, refs }) {
           <svg>
             <circle></circle>
             ${edges.map(edge =>
-              `<polyline class="edge" points="${edge.pointsString}" style="stroke: ${edge.strokeColor};" />`
+              `<polyline class="edge" points="${edge.pointsString}" stroke-dasharray="${calculatePointsStringLength(edge.pointsString)}" style="stroke: ${edge.strokeColor};" />`
             ).join('')}
           </svg>
         </div>
@@ -338,11 +338,6 @@ async function renderCommits({ commits, refs }) {
       commitElement = commitsContainer.lastElementChild;
       commitElement._rowIndex = node.row;
       commitElementsByCommitId[commit.id] = commitElement;
-      for (const edgeElement of commitElement.querySelectorAll('.edge')) {
-        // Setting stroke-dasharray to polylineLength allows a gap using stroke-dashoffset.
-        const polylineLength = edgeElement.getTotalLength();
-        edgeElement.setAttribute('stroke-dasharray', polylineLength);
-      }
       // Animate only visible commits for performance
       if (node.row >= viewportMinRowIndex && node.row <= viewportMaxRowIndex) {
         // Half duration so that leaving elements are hidden before entering elements appear.

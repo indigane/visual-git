@@ -5,7 +5,7 @@ function distanceBetweenPoints (x1, y1, x2, y2) {
   return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 }
 
-function calculatePointsStringLength(pointsString) {
+export function calculatePointsStringLength(pointsString) {
   const pointsArray = pointsString.split(',').map(Number);
   let totalLength = 0;
   for (let i = 0; i < pointsArray.length - 2; i += 2) {
