@@ -73,9 +73,16 @@ async function renderCommits({ commits, refs }) {
   //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
   //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
   const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
+  const columnWidth = 32;
+  const rowHeight = 32;
+  const viewportMinRowIndex = Math.floor(document.documentElement.scrollTop / rowHeight);
+  const viewportMaxRowIndex = Math.ceil((document.documentElement.scrollTop + window.innerHeight) / rowHeight);
   const redrawTransitionDurationMs = 1000;
   const maxRow = commits.length - 1;
   const commitElementsToKeep = [];
+
+  commitsContainer.style.setProperty('--column-width', columnWidth + 'px');
+  commitsContainer.style.setProperty('--row-height', rowHeight + 'px');
 
   // Reverse mapping for refs
   const refsForCommitId = {};
@@ -241,8 +248,6 @@ async function renderCommits({ commits, refs }) {
       return refsToRender.map(renderRef).join('');
     }
     function getEdges() {
-      const rowHeight = 32;
-      const columnWidth = 32;
       const xOffset = columnWidth / 2;
       const yOffset = rowHeight / 2;
       const cornerOffset = rowHeight / 3;
@@ -316,6 +321,7 @@ async function renderCommits({ commits, refs }) {
     const edges = getEdges();
     let commitElement = commitElementsByCommitId[commit.id];
     if (commitElement === undefined) {
+      // New commit element
       commitsContainer.insertAdjacentHTML('beforeend', `
       <div class="commit" style="--row: ${node.row}; --column: ${node.path.columnIndex}; --color: ${color}; --transition-duration: ${redrawTransitionDurationMs}ms;" data-commit-id="${node.commit.id}">
         <div class="graph">
@@ -330,30 +336,54 @@ async function renderCommits({ commits, refs }) {
       </div>
       `.trim());
       commitElement = commitsContainer.lastElementChild;
+      commitElement._rowIndex = node.row;
       commitElementsByCommitId[commit.id] = commitElement;
       for (const edgeElement of commitElement.querySelectorAll('.edge')) {
         // Setting stroke-dasharray to polylineLength allows a gap using stroke-dashoffset.
         const polylineLength = edgeElement.getTotalLength();
         edgeElement.setAttribute('stroke-dasharray', polylineLength);
       }
-      // Half duration so that leaving elements are hidden before entering elements appear.
-      const halfDuration = redrawTransitionDurationMs / 2;
-      animateCommitEnter(commitElement, halfDuration);
-    }
-    else {
-      commitElement.style.setProperty('--transition-duration', redrawTransitionDurationMs + 'ms');
-      commitElement.style.setProperty('--row', node.row);
-      commitElement.style.setProperty('--column', node.path.columnIndex);
-      commitElement.style.setProperty('--color', color);
-      animateEdgesTransition(commitElement, edges, redrawTransitionDurationMs);
+      // Animate only visible commits for performance
+      if (node.row >= viewportMinRowIndex && node.row <= viewportMaxRowIndex) {
+        // Half duration so that leaving elements are hidden before entering elements appear.
+        const halfDuration = redrawTransitionDurationMs / 2;
+        animateCommitEnter(commitElement, halfDuration);
+      }
+    } else {
+      // Existing commit element
+      const isOldCommitElementWithinViewport = commitElement._rowIndex >= viewportMinRowIndex && commitElement._rowIndex <= viewportMaxRowIndex;
+      const isNewCommitElementWithinViewport = node.row >= viewportMinRowIndex && node.row <= viewportMaxRowIndex;
+      commitElement._rowIndex = node.row;
+      // Animate only visible commits for performance
+      if (isOldCommitElementWithinViewport || isNewCommitElementWithinViewport) {
+        commitElement.style.removeProperty('transition-duration');
+        commitElement.style.setProperty('--transition-duration', redrawTransitionDurationMs + 'ms');
+        commitElement.style.setProperty('--row', node.row);
+        commitElement.style.setProperty('--column', node.path.columnIndex);
+        commitElement.style.setProperty('--color', color);
+        animateEdgesTransition(commitElement, edges, redrawTransitionDurationMs);
+      }
+      else {
+        commitElement.style.setProperty('transition-duration', '0s');
+        commitElement.style.setProperty('--row', node.row);
+        commitElement.style.setProperty('--column', node.path.columnIndex);
+        commitElement.style.setProperty('--color', color);
+      }
     }
     commitElementsToKeep.push(commitElement);
   }
   for (const [commitId, commitElement] of Object.entries(commitElementsByCommitId)) {
     if ( ! commitElementsToKeep.includes(commitElement)) {
-      // Half duration so that leaving elements are hidden before entering elements appear.
-      const halfDuration = redrawTransitionDurationMs / 2;
-      animateCommitLeave(commitElement, halfDuration).then(() => commitElement.remove());
+      // Animate only visible commits for performance
+      const isWithinViewport = commitElement._rowIndex >= viewportMinRowIndex && commitElement._rowIndex <= viewportMaxRowIndex;
+      if (isWithinViewport) {
+        // Half duration so that leaving elements are hidden before entering elements appear.
+        const halfDuration = redrawTransitionDurationMs / 2;
+        animateCommitLeave(commitElement, halfDuration).then(() => commitElement.remove());
+      }
+      else {
+        commitElement.remove();
+      }
       delete commitElementsByCommitId[commitId];
     }
   }

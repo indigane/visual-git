@@ -7,13 +7,13 @@ html, body {
 .commits {
   position: relative;
   --max-column: 1;
+  --column-width: 32px;
+  --row-height: 32px;
   z-index: 2;
 }
 .commit {
   --row: 0;
   --column: 0;
-  --column-width: 2em;
-  --row-height: 2em;
   --max-graph-width: 50vw;
   --graph-width: min(calc(var(--column-width) * var(--max-column)), var(--max-graph-width));
   contain: size layout style;
@@ -47,8 +47,8 @@ html, body {
 .commit .graph svg {
   --size: var(--row-height);
   --offset-left: calc(var(--column-width) * var(--column));
-  width: 32px;
-  height: 32px;
+  width: var(--size);
+  height: var(--size);
   overflow: visible;
 }
 .commit .graph circle {
@@ -62,11 +62,11 @@ html, body {
   transition-timing-function: ease-in-out;
 }
 .commit .graph .edge {
-  --stroke-width: 2px;
+  --stroke-width: calc(var(--size) / 16);
   stroke: black;
   stroke-width: var(--stroke-width);
   fill: transparent;
-  stroke-dashoffset: -5px;
+  stroke-dashoffset: calc(-1 * var(--size) / 6.4);
   transition: stroke var(--transition-duration, 0) ease-in-out;
 }
 .commit .message {
