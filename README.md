@@ -1,5 +1,7 @@
 # Visual Git
 
+Visual Git is the Git GUI I've wished existed so I didn't have to write it myself.
+
 Some ideas Visual Git may or may not be built on:
 
 - **See everything** you need without polling. Reduce mistakes by being aware of the state of your repository at all times.
