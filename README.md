@@ -1,8 +1,15 @@
 # Visual Git
 
+Some ideas Visual Git may or may not be built on:
+
+- **See everything** you need without polling. Reduce mistakes by being aware of the state of your repository at all times.
+- **Interact with everything** you see. Visual git tries hard to never say "no", but also to keep you informed of the consequences.
+- **Learn** git. Start from visually intuitive concepts and drill down all the way into git internals if you want to.
+
+
 ## Installation
 
-- Download visual git.<br>
+- Download Visual Git.<br>
   _For example:_
   ```sh
   git clone https://gitlab.com/indigane/visual-git.git
