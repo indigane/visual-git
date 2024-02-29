@@ -1,6 +1,6 @@
 # Visual Git
 
-Visual Git is the Git GUI I've wished existed so I didn't have to write it myself.
+Visual Git is the Git GUI I've wished existed so I wouldn't have to write it myself.
 
 Some ideas Visual Git may or may not be built on:
 
