@@ -66,6 +66,155 @@ class Node {
 
 
 const commitElementsByCommitId = {};
+const commitContextByCommitId = {};
+const commitIdByRowIndex = {};
+const previousViewportRowIndices = {
+  min: -1,
+  max: -1,
+};
+
+
+const commitElementPool = {
+  commitTemplate: document.querySelector('#commit-template'),
+  commitsContainer: document.querySelector('.commits'),
+  elementsByCommitId: {},
+  index: 0,
+  pool: [],
+  getNext: function () {
+    const { viewportMinRowIndex, viewportMaxRowIndex } = getViewportMinMaxRows();
+    for (let i = 0; i < this.pool.length; i++) {
+      const commitElement = this.pool[this.index % this.pool.length];
+      this.index += 1;
+      if (commitElement._availableForReuse) {
+        return commitElement;
+      }
+      const isWithinViewport = isCommitInRange(commitElement._context, viewportMinRowIndex, viewportMaxRowIndex);
+      if (isWithinViewport) {
+        continue;
+      } else {
+        return commitElement;
+      }
+    }
+
+    const commitElement = this.commitTemplate.content.cloneNode(true).firstElementChild;
+    this.commitsContainer.appendChild(commitElement);
+    this.pool.push(commitElement);
+    commitElement._elems = {
+      polylines: [...commitElement.querySelectorAll('polyline')],
+      message: commitElement.querySelector('.message'),
+    };
+    return commitElement;
+  },
+  removeByCommitId: function (commitId) {
+    const commitElement = this.elementsByCommitId[commitId];
+    if (commitElement === undefined) {
+      return;
+    }
+    this.remove(commitElement);
+  },
+  remove: function (commitElement) {
+    delete this.elementsByCommitId[commitElement._boundCommitId];
+    commitElement.style.display = 'none';
+    commitElement._boundCommitId = undefined;
+  },
+  get: function (commitId) {
+    const commitContext = commitContextByCommitId[commitId];
+    if (this.elementsByCommitId[commitId] !== undefined) {
+      return this.elementsByCommitId[commitId];
+    }
+    const commitElement = this.getNext();
+    if (commitContext !== undefined) {
+      updateCommitElement(commitElement, commitContext);
+    }
+    // Delete previous reference so that there are no stale references.
+    delete this.elementsByCommitId[commitElement._boundCommitId];
+    this.elementsByCommitId[commitId] = commitElement;
+    commitElement._boundCommitId = commitId;
+    return commitElement;
+  },
+};
+
+
+function updateCommitElement(commitElement, context, oldContext) {
+  // Remove `display: none;`
+  commitElement.style.removeProperty('display');
+  commitElement._context = context;
+  commitElement.style.setProperty('--transition-duration', context.transitionDuration ?? '0s');
+  commitElement.style.setProperty('--row', context.row);
+  commitElement.style.setProperty('--column', context.column);
+  commitElement.style.setProperty('--color', context.color);
+  commitElement.style.setProperty('--max-column', context.maxColumn);
+  commitElement.setAttribute('data-commit-id', context.commitId);
+  for (const [index, polyline] of commitElement._elems.polylines.entries()) {
+    const edge = context.edges[index];
+    polyline.setAttribute('points', edge?.pointsString);
+    polyline.setAttribute('stroke-dasharray', edge?.totalLength);
+    polyline.style.stroke = edge?.strokeColor;
+  }
+  if (oldContext?.subject !== context.subject) {
+    commitElement._elems.message.textContent = context.subject;
+  }
+}
+
+
+function getViewportMinMaxRows() {
+  const columnWidth = 32;
+  const rowHeight = 32;
+  const topOffset = 5;
+  const bottomOffset = 5;
+  const viewportMinRowIndex = Math.floor(document.documentElement.scrollTop / rowHeight) - topOffset;
+  const viewportMaxRowIndex = Math.ceil((document.documentElement.scrollTop + window.innerHeight) / rowHeight) + bottomOffset;
+  return { viewportMinRowIndex, viewportMaxRowIndex };
+}
+
+
+function isCommitInRange(commitContext, minRow, maxRow) {
+  if (commitContext === undefined) {
+    return false;
+  }
+  if (commitContext.row >= minRow && commitContext.row <= maxRow) {
+    return true;
+  }
+  // If the commit is above the viewport, it may have an edge hanging downwards that is in range.
+  if (commitContext.row < minRow) {
+    for (const parentCommitRow of commitContext.parentCommitRows) {
+      if (parentCommitRow >= minRow) {
+        // The edge from commit to parent is visible in the viewport.
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+
+document.addEventListener('scroll', requestVisibleCommitsRender);
+window.addEventListener('resize', requestVisibleCommitsRender);
+let visibleCommitsRenderRequested = false;
+function requestVisibleCommitsRender() {
+  if (visibleCommitsRenderRequested) {
+    return;
+  }
+  visibleCommitsRenderRequested = true;
+  requestAnimationFrame(renderVisibleCommits);
+}
+function renderVisibleCommits() {
+  const { viewportMinRowIndex, viewportMaxRowIndex } = getViewportMinMaxRows();
+  for (let rowIndex = viewportMinRowIndex; rowIndex <= viewportMaxRowIndex; rowIndex++) {
+    if (rowIndex >= previousViewportRowIndices.min && rowIndex <= previousViewportRowIndices.max) {
+      // The previous viewport already made this row visible.
+      continue;
+    }
+    const commitId = commitIdByRowIndex[rowIndex];
+    if (commitId === undefined) {
+      continue;
+    }
+    commitElementPool.get(commitId);
+  }
+  previousViewportRowIndices.min = viewportMinRowIndex;
+  previousViewportRowIndices.max = viewportMaxRowIndex;
+  visibleCommitsRenderRequested = false;
+}
 
 
 async function renderCommits({ commits, refs }) {
@@ -75,14 +224,16 @@ async function renderCommits({ commits, refs }) {
   const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
   const columnWidth = 32;
   const rowHeight = 32;
-  const viewportMinRowIndex = Math.floor(document.documentElement.scrollTop / rowHeight);
-  const viewportMaxRowIndex = Math.ceil((document.documentElement.scrollTop + window.innerHeight) / rowHeight);
   const redrawTransitionDurationMs = 1000;
   const maxRow = commits.length - 1;
-  const commitElementsToKeep = [];
+  const knownCommitIdsForEnterLeaveAnimation = [];
+  const { viewportMinRowIndex, viewportMaxRowIndex } = getViewportMinMaxRows();
+  previousViewportRowIndices.min = viewportMinRowIndex;
+  previousViewportRowIndices.max = viewportMaxRowIndex;
 
   commitsContainer.style.setProperty('--column-width', columnWidth + 'px');
   commitsContainer.style.setProperty('--row-height', rowHeight + 'px');
+  commitsContainer.style.setProperty('--max-row', maxRow);
 
   // Reverse mapping for refs
   const refsForCommitId = {};
@@ -222,7 +373,7 @@ async function renderCommits({ commits, refs }) {
   }
   // Update max column
   const maxColumn = columns.length;
-  commitsContainer.style.setProperty('--max-column', maxColumn);
+  // commitsContainer.style.setProperty('--max-column', maxColumn);
 
   // Draw nodes and edges
   for (const [index, commit] of commits.entries()) {
@@ -307,8 +458,10 @@ async function renderCommits({ commits, refs }) {
           points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
           strokeColor = colors[parentNode.path.columnIndex % colors.length];
         }
+        const pointsString = [points].join(' ');
         edges.push({
-          pointsString: [points].join(' '),
+          pointsString,
+          totalLength: calculatePointsStringLength(pointsString),
           strokeColor,
         });
       }
@@ -319,67 +472,61 @@ async function renderCommits({ commits, refs }) {
     const nodeRefs = refsForCommitId[commit.id] ?? [];
     const color = colors[node.path.columnIndex % colors.length];
     const edges = getEdges();
-    let commitElement = commitElementsByCommitId[commit.id];
-    if (commitElement === undefined) {
-      // New commit element
-      commitsContainer.insertAdjacentHTML('beforeend', `
-      <div class="commit" style="--row: ${node.row}; --column: ${node.path.columnIndex}; --color: ${color}; --transition-duration: ${redrawTransitionDurationMs}ms;" data-commit-id="${node.commit.id}">
-        <div class="graph">
-          <svg>
-            <circle></circle>
-            ${edges.map(edge =>
-              `<polyline class="edge" points="${edge.pointsString}" stroke-dasharray="${calculatePointsStringLength(edge.pointsString)}" style="stroke: ${edge.strokeColor};" />`
-            ).join('')}
-          </svg>
-        </div>
-        <div class="message">${renderRefs(nodeRefs)} ${asTextContent(node.commit.subject)}</div>
-      </div>
-      `.trim());
-      commitElement = commitsContainer.lastElementChild;
-      commitElement._rowIndex = node.row;
-      commitElementsByCommitId[commit.id] = commitElement;
-      // Animate only visible commits for performance
-      if (node.row >= viewportMinRowIndex && node.row <= viewportMaxRowIndex) {
-        // Half duration so that leaving elements are hidden before entering elements appear.
-        const halfDuration = redrawTransitionDurationMs / 2;
-        animateCommitEnter(commitElement, halfDuration);
-      }
-    } else {
-      // Existing commit element
-      const isOldCommitElementWithinViewport = commitElement._rowIndex >= viewportMinRowIndex && commitElement._rowIndex <= viewportMaxRowIndex;
-      const isNewCommitElementWithinViewport = node.row >= viewportMinRowIndex && node.row <= viewportMaxRowIndex;
-      commitElement._rowIndex = node.row;
-      // Animate only visible commits for performance
-      if (isOldCommitElementWithinViewport || isNewCommitElementWithinViewport) {
-        commitElement.style.removeProperty('transition-duration');
-        commitElement.style.setProperty('--transition-duration', redrawTransitionDurationMs + 'ms');
-        commitElement.style.setProperty('--row', node.row);
-        commitElement.style.setProperty('--column', node.path.columnIndex);
-        commitElement.style.setProperty('--color', color);
-        animateEdgesTransition(commitElement, edges, redrawTransitionDurationMs);
-      }
-      else {
-        commitElement.style.setProperty('transition-duration', '0s');
-        commitElement.style.setProperty('--row', node.row);
-        commitElement.style.setProperty('--column', node.path.columnIndex);
-        commitElement.style.setProperty('--color', color);
+    //let commitElement = commitElementsByCommitId[commit.id];
+    const newCommitContext = {
+      row: node.row,
+      column: node.path.columnIndex,
+      color,
+      commitId: commit.id,
+      parentCommitRows: commit.parents.map(parentId => nodeForCommitId.get(parentId)?.row ?? maxRow),
+      edges,
+      subject: commit.subject,
+      maxColumn,
+    };
+    const oldCommitContext = commitContextByCommitId[commit.id];
+    const isOldCommitElementWithinViewport = isCommitInRange(oldCommitContext, viewportMinRowIndex, viewportMaxRowIndex);
+    const isNewCommitElementWithinViewport = isCommitInRange(newCommitContext, viewportMinRowIndex, viewportMaxRowIndex);
+    if (isOldCommitElementWithinViewport || isNewCommitElementWithinViewport) {
+      const commitElement = commitElementPool.get(commit.id);
+      if (oldCommitContext === undefined) {
+        // New commit element
+        updateCommitElement(commitElement, {...newCommitContext, transitionDuration: '0s'});
+        // Animate only visible commits for performance
+        if (node.row >= viewportMinRowIndex && node.row <= viewportMaxRowIndex) {
+          // Half duration so that leaving elements are hidden before entering elements appear.
+          const halfDuration = redrawTransitionDurationMs / 2;
+          animateCommitEnter(commitElement, halfDuration);
+        }
+      } else {
+        // Existing commit element
+        // Animate only visible commits for performance
+        if (isOldCommitElementWithinViewport || isNewCommitElementWithinViewport) {
+          updateCommitElement(commitElement, {...newCommitContext, transitionDuration: redrawTransitionDurationMs + 'ms'}, oldCommitContext);
+          animateEdgesTransition(commitElement, edges, oldCommitContext.edges, redrawTransitionDurationMs);
+        }
+        else {
+          updateCommitElement(commitElement, {...newCommitContext, transitionDuration: '0s'}, oldCommitContext);
+        }
       }
     }
-    commitElementsToKeep.push(commitElement);
+    commitContextByCommitId[commit.id] = newCommitContext;
+    commitIdByRowIndex[newCommitContext.row] = commit.id;
+    knownCommitIdsForEnterLeaveAnimation.push(commit.id);
   }
-  for (const [commitId, commitElement] of Object.entries(commitElementsByCommitId)) {
-    if ( ! commitElementsToKeep.includes(commitElement)) {
+  for (const [commitId, commitContext] of Object.entries(commitContextByCommitId)) {
+    if ( ! knownCommitIdsForEnterLeaveAnimation.includes(commitId)) {
       // Animate only visible commits for performance
-      const isWithinViewport = commitElement._rowIndex >= viewportMinRowIndex && commitElement._rowIndex <= viewportMaxRowIndex;
+      const isWithinViewport = isCommitInRange(commitContext, viewportMinRowIndex, viewportMaxRowIndex);
       if (isWithinViewport) {
+        const commitElement = commitElementPool.get(commitId);
         // Half duration so that leaving elements are hidden before entering elements appear.
         const halfDuration = redrawTransitionDurationMs / 2;
-        animateCommitLeave(commitElement, halfDuration).then(() => commitElement.remove());
+        animateCommitLeave(commitElement, halfDuration).then(() => commitElementPool.removeByCommitId(commitId));
       }
       else {
-        commitElement.remove();
+        //commitElement.hidden = true;
       }
-      delete commitElementsByCommitId[commitId];
+      delete commitContextByCommitId[commitId];
     }
   }
 }

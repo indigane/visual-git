@@ -14,22 +14,20 @@ export function calculatePointsStringLength(pointsString) {
   return totalLength;
 }
 
-export function animateEdgesTransition(commitElement, edges, duration) {
+export function animateEdgesTransition(commitElement, newEdges, oldEdges, duration) {
   const edgeElements = commitElement.querySelectorAll('.edge');
-  for (const [index, edge] of edges.entries()) {
+  for (const [index, newEdge] of newEdges.entries()) {
+    const oldEdge = oldEdges[index];
     const edgeElement = edgeElements[index];
-    const oldPointsString = edgeElement.getAttribute('points');
-    const oldPolylineLength = edgeElement.getAttribute('stroke-dasharray');
     // Remove existing animations
     edgeElement.replaceChildren();
-    edgeElement.setAttribute('points', edge.pointsString);
+    edgeElement.setAttribute('points', newEdge.pointsString);
     // Calculate polylineLength instead of calling Polyline.getTotalLength()
     // to fix issues when getTotalLength is called during animation.
-    const polylineLength = calculatePointsStringLength(edge.pointsString);
-    edgeElement.setAttribute('stroke-dasharray', polylineLength);
-    edgeElement.style.stroke = edge.strokeColor;
-    edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="points" values="${oldPointsString};${edge.pointsString}" dur="${duration}ms" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
-    edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="stroke-dasharray" values="${oldPolylineLength};${polylineLength}" dur="${duration}ms" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
+    edgeElement.setAttribute('stroke-dasharray', newEdge.totalLength);
+    edgeElement.style.stroke = newEdge.strokeColor;
+    edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="points" values="${oldEdge.pointsString};${newEdge.pointsString}" dur="${duration}ms" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
+    edgeElement.insertAdjacentHTML('beforeend', `<animate attributeName="stroke-dasharray" values="${oldEdge.totalLength};${newEdge.totalLength}" dur="${duration}ms" repeatCount="1" keySplines="0.42 0.0 0.58 1.0" calcMode="spline">`);
   }
   // Edge animation timing
   const svgElement = commitElement.querySelector('svg');

@@ -6,9 +6,12 @@ html, body {
 }
 .commits {
   position: relative;
+  contain: size layout style;
   --max-column: 1;
   --column-width: 32px;
   --row-height: 32px;
+  --max-row: 1;
+  height: calc(var(--max-row) * var(--row-height));
   z-index: 2;
 }
 .commit {
