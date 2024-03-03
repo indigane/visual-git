@@ -65,7 +65,6 @@ class Node {
 }
 
 
-const commitElementsByCommitId = {};
 const commitContextByCommitId = {};
 const commitIdByRowIndex = {};
 const previousViewportRowIndices = {
@@ -75,8 +74,6 @@ const previousViewportRowIndices = {
 
 
 const commitElementPool = {
-  commitTemplate: document.querySelector('#commit-template'),
-  commitsContainer: document.querySelector('.commits'),
   elementsByCommitId: {},
   index: 0,
   pool: [],
@@ -85,24 +82,20 @@ const commitElementPool = {
     for (let i = 0; i < this.pool.length; i++) {
       const commitElement = this.pool[this.index % this.pool.length];
       this.index += 1;
-      if (commitElement._availableForReuse) {
+      if (commitElement._boundCommitId === undefined) {
         return commitElement;
       }
       const isWithinViewport = isCommitInRange(commitElement._context, viewportMinRowIndex, viewportMaxRowIndex);
       if (isWithinViewport) {
+        // Do not reuse visible commit elements.
         continue;
       } else {
         return commitElement;
       }
     }
-
-    const commitElement = this.commitTemplate.content.cloneNode(true).firstElementChild;
-    this.commitsContainer.appendChild(commitElement);
+    // Pool is out of available elements.
+    const commitElement = createCommitElement();
     this.pool.push(commitElement);
-    commitElement._elems = {
-      polylines: [...commitElement.querySelectorAll('polyline')],
-      message: commitElement.querySelector('.message'),
-    };
     return commitElement;
   },
   removeByCommitId: function (commitId) {
@@ -135,6 +128,19 @@ const commitElementPool = {
 };
 
 
+const commitTemplate = document.querySelector('#commit-template');
+const commitsContainer = document.querySelector('.commits');
+function createCommitElement() {
+  const commitElement = commitTemplate.content.cloneNode(true).firstElementChild;
+  commitsContainer.appendChild(commitElement);
+  commitElement._elems = {
+    polylines: [...commitElement.querySelectorAll('polyline')],
+    message: commitElement.querySelector('.message'),
+  };
+  return commitElement;
+}
+
+
 function updateCommitElement(commitElement, context, oldContext) {
   // Remove `display: none;`
   commitElement.style.removeProperty('display');
@@ -147,9 +153,9 @@ function updateCommitElement(commitElement, context, oldContext) {
   commitElement.setAttribute('data-commit-id', context.commitId);
   for (const [index, polyline] of commitElement._elems.polylines.entries()) {
     const edge = context.edges[index];
-    polyline.setAttribute('points', edge?.pointsString);
-    polyline.setAttribute('stroke-dasharray', edge?.totalLength);
-    polyline.style.stroke = edge?.strokeColor;
+    polyline.setAttribute('points', edge?.pointsString ?? '');
+    polyline.setAttribute('stroke-dasharray', edge?.totalLength ?? '');
+    polyline.style.stroke = edge?.strokeColor ?? '';
   }
   if (oldContext?.subject !== context.subject) {
     commitElement._elems.message.textContent = context.subject;
@@ -379,7 +385,6 @@ async function renderCommits({ commits, refs }) {
   }
   // Update max column
   const maxColumn = columns.length;
-  // commitsContainer.style.setProperty('--max-column', maxColumn);
 
   // Draw nodes and edges
   for (const [index, commit] of commits.entries()) {
@@ -478,7 +483,6 @@ async function renderCommits({ commits, refs }) {
     const nodeRefs = refsForCommitId[commit.id] ?? [];
     const color = colors[node.path.columnIndex % colors.length];
     const edges = getEdges();
-    //let commitElement = commitElementsByCommitId[commit.id];
     const newCommitContext = {
       row: node.row,
       column: node.path.columnIndex,
@@ -498,22 +502,13 @@ async function renderCommits({ commits, refs }) {
       if (oldCommitContext === undefined) {
         // New commit element
         updateCommitElement(commitElement, {...newCommitContext, transitionDuration: '0s'});
-        // Animate only visible commits for performance
-        if (node.row >= viewportMinRowIndex && node.row <= viewportMaxRowIndex) {
-          // Half duration so that leaving elements are hidden before entering elements appear.
-          const halfDuration = redrawTransitionDurationMs / 2;
-          animateCommitEnter(commitElement, halfDuration);
-        }
+        // Half duration so that leaving elements are hidden before entering elements appear.
+        const halfDuration = redrawTransitionDurationMs / 2;
+        animateCommitEnter(commitElement, halfDuration);
       } else {
         // Existing commit element
-        // Animate only visible commits for performance
-        if (isOldCommitElementWithinViewport || isNewCommitElementWithinViewport) {
-          updateCommitElement(commitElement, {...newCommitContext, transitionDuration: redrawTransitionDurationMs + 'ms'}, oldCommitContext);
-          animateEdgesTransition(commitElement, edges, oldCommitContext.edges, redrawTransitionDurationMs);
-        }
-        else {
-          updateCommitElement(commitElement, {...newCommitContext, transitionDuration: '0s'}, oldCommitContext);
-        }
+        updateCommitElement(commitElement, {...newCommitContext, transitionDuration: redrawTransitionDurationMs + 'ms'}, oldCommitContext);
+        animateEdgesTransition(commitElement, edges, oldCommitContext.edges, redrawTransitionDurationMs);
       }
     }
     commitContextByCommitId[commit.id] = newCommitContext;
@@ -521,8 +516,8 @@ async function renderCommits({ commits, refs }) {
     knownCommitIdsForEnterLeaveAnimation.push(commit.id);
   }
   for (const [commitId, commitContext] of Object.entries(commitContextByCommitId)) {
-    if ( ! knownCommitIdsForEnterLeaveAnimation.includes(commitId)) {
-      // Animate only visible commits for performance
+    const isCommitGone = knownCommitIdsForEnterLeaveAnimation.includes(commitId) === false;
+    if (isCommitGone) {
       const isWithinViewport = isCommitInRange(commitContext, viewportMinRowIndex, viewportMaxRowIndex);
       if (isWithinViewport) {
         const commitElement = commitElementPool.get(commitId);
@@ -531,7 +526,7 @@ async function renderCommits({ commits, refs }) {
         animateCommitLeave(commitElement, halfDuration).then(() => commitElementPool.removeByCommitId(commitId));
       }
       else {
-        //commitElement.hidden = true;
+        commitElementPool.removeByCommitId(commitId);
       }
       delete commitContextByCommitId[commitId];
     }
