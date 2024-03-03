@@ -206,10 +206,16 @@ function renderVisibleCommits() {
       continue;
     }
     const commitId = commitIdByRowIndex[rowIndex];
-    if (commitId === undefined) {
-      continue;
+    if (commitId !== undefined) {
+      commitElementPool.get(commitId);
     }
-    commitElementPool.get(commitId);
+    const commitContext = commitContextByCommitId[commitId];
+    // Render any commit that points to this commit as their parent,
+    // because those nodes have an edge hanging downwards that needs
+    // to be rendered as it connects to this node.
+    for (const childCommitId of commitContext.childCommitIds) {
+      commitElementPool.get(childCommitId);
+    }
   }
   previousViewportRowIndices.min = viewportMinRowIndex;
   previousViewportRowIndices.max = viewportMaxRowIndex;
@@ -478,6 +484,7 @@ async function renderCommits({ commits, refs }) {
       column: node.path.columnIndex,
       color,
       commitId: commit.id,
+      childCommitIds: node.children.map(childNode => childNode.commit.id),
       parentCommitRows: commit.parents.map(parentId => nodeForCommitId.get(parentId)?.row ?? maxRow),
       edges,
       subject: commit.subject,
