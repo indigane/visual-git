@@ -219,7 +219,7 @@ function renderVisibleCommits() {
     // Render any commit that points to this commit as their parent,
     // because those nodes have an edge hanging downwards that needs
     // to be rendered as it connects to this node.
-    for (const childCommitId of commitContext.childCommitIds) {
+    for (const childCommitId of commitContext?.childCommitIds ?? []) {
       commitElementPool.get(childCommitId);
     }
   }
