@@ -33,11 +33,17 @@ export function animateEdgesTransition(commitElement, newEdges, oldEdges, durati
   const svgElement = commitElement.querySelector('svg');
   const syncSVGAnimationToCSSTransition = () => {
     svgElement.unpauseAnimations();
-    commitElement.removeEventListener('transitionstart', syncSVGAnimationToCSSTransition);
+    commitElement.removeEventListener('transitionrun', syncSVGAnimationToCSSTransition);
   };
   svgElement.pauseAnimations();
   svgElement.setCurrentTime(0);
-  commitElement.addEventListener('transitionstart', syncSVGAnimationToCSSTransition);
+  commitElement.addEventListener('transitionrun', syncSVGAnimationToCSSTransition);
+  // HACK: After two frames, if the transition has not started, start the animation anyway.
+  // The transition will never start, if there is nothing else to animate except the edge.
+  // This may also help with the syncing in Chromium based browsers.
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(syncSVGAnimationToCSSTransition);
+  });
 }
 
 export function animateCommitEnter(commitElement, duration) {
