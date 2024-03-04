@@ -153,9 +153,15 @@ function updateCommitElement(commitElement, context, oldContext) {
   commitElement.setAttribute('data-commit-id', context.commitId);
   for (const [index, polyline] of commitElement._elems.polylines.entries()) {
     const edge = context.edges[index];
-    polyline.setAttribute('points', edge?.pointsString ?? '');
-    polyline.setAttribute('stroke-dasharray', edge?.totalLength ?? '');
-    polyline.style.stroke = edge?.strokeColor ?? '';
+    if (edge) {
+      polyline.style.removeProperty('display');
+      polyline.setAttribute('points', edge.pointsString);
+      polyline.setAttribute('stroke-dasharray', edge.totalLength);
+      polyline.style.stroke = edge.strokeColor;
+    }
+    else {
+      polyline.style.display = 'none';
+    }
   }
   if (oldContext?.subject !== context.subject) {
     commitElement._elems.message.textContent = context.subject;
