@@ -200,16 +200,8 @@ function isCommitInRange(commitContext, minRow, maxRow) {
 }
 
 
-document.addEventListener('scroll', requestVisibleCommitsRender);
-window.addEventListener('resize', requestVisibleCommitsRender);
-let visibleCommitsRenderRequested = false;
-function requestVisibleCommitsRender() {
-  if (visibleCommitsRenderRequested) {
-    return;
-  }
-  visibleCommitsRenderRequested = true;
-  requestAnimationFrame(renderVisibleCommits);
-}
+document.addEventListener('scroll', renderVisibleCommits);
+window.addEventListener('resize', renderVisibleCommits);
 function renderVisibleCommits() {
   const { viewportMinRowIndex, viewportMaxRowIndex } = getViewportMinMaxRows();
   for (let rowIndex = viewportMinRowIndex; rowIndex <= viewportMaxRowIndex; rowIndex++) {
@@ -231,7 +223,6 @@ function renderVisibleCommits() {
   }
   previousViewportRowIndices.min = viewportMinRowIndex;
   previousViewportRowIndices.max = viewportMaxRowIndex;
-  visibleCommitsRenderRequested = false;
 }
 
 
