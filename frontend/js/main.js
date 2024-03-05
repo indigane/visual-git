@@ -384,6 +384,7 @@ async function renderCommits({ commits, refs }) {
   const maxColumn = columns.length;
 
   // Draw nodes and edges
+  const deferredAnimations = [];
   for (const [index, commit] of commits.entries()) {
     // Non-blocking iteration
     const batchSize = 1000;
@@ -495,18 +496,20 @@ async function renderCommits({ commits, refs }) {
     const isOldCommitElementWithinViewport = isCommitInRange(oldCommitContext, viewportMinRowIndex, viewportMaxRowIndex);
     const isNewCommitElementWithinViewport = isCommitInRange(newCommitContext, viewportMinRowIndex, viewportMaxRowIndex);
     if (isOldCommitElementWithinViewport || isNewCommitElementWithinViewport) {
-      const commitElement = commitElementPool.get(commit.id);
-      if (oldCommitContext === undefined) {
-        // New commit element
-        updateCommitElement(commitElement, {...newCommitContext, transitionDuration: '0s'});
-        // Half duration so that leaving elements are hidden before entering elements appear.
-        const halfDuration = redrawTransitionDurationMs / 2;
-        animateCommitEnter(commitElement, halfDuration);
-      } else {
-        // Existing commit element
-        updateCommitElement(commitElement, {...newCommitContext, transitionDuration: redrawTransitionDurationMs + 'ms'}, oldCommitContext);
-        animateEdgesTransition(commitElement, edges, oldCommitContext.edges, redrawTransitionDurationMs);
-      }
+      deferredAnimations.push(() => {
+        const commitElement = commitElementPool.get(commit.id);
+        if (oldCommitContext === undefined) {
+          // New commit element
+          updateCommitElement(commitElement, {...newCommitContext, transitionDuration: '0s'});
+          // Half duration so that leaving elements are hidden before entering elements appear.
+          const halfDuration = redrawTransitionDurationMs / 2;
+          animateCommitEnter(commitElement, halfDuration);
+        } else {
+          // Existing commit element
+          updateCommitElement(commitElement, {...newCommitContext, transitionDuration: redrawTransitionDurationMs + 'ms'}, oldCommitContext);
+          animateEdgesTransition(commitElement, edges, oldCommitContext.edges, redrawTransitionDurationMs);
+        }
+      });
     }
     commitContextByCommitId[commit.id] = newCommitContext;
     commitIdByRowIndex[newCommitContext.row] = commit.id;
@@ -517,16 +520,27 @@ async function renderCommits({ commits, refs }) {
     if (isCommitGone) {
       const isWithinViewport = isCommitInRange(commitContext, viewportMinRowIndex, viewportMaxRowIndex);
       if (isWithinViewport) {
-        const commitElement = commitElementPool.get(commitId);
-        // Half duration so that leaving elements are hidden before entering elements appear.
-        const halfDuration = redrawTransitionDurationMs / 2;
-        animateCommitLeave(commitElement, halfDuration).then(() => commitElementPool.removeByCommitId(commitId));
+        deferredAnimations.push(() => {
+          const commitElement = commitElementPool.get(commitId);
+          // Half duration so that leaving elements are hidden before entering elements appear.
+          const halfDuration = redrawTransitionDurationMs / 2;
+          animateCommitLeave(commitElement, halfDuration).then(() => commitElementPool.removeByCommitId(commitId));
+        });
       }
       else {
         commitElementPool.removeByCommitId(commitId);
       }
       delete commitContextByCommitId[commitId];
     }
+  }
+  // For now all animations are deferred until the end of graph construction.
+  // An optimization is possible:
+  // - Move knownCommitIdsForEnterLeaveAnimation to the first-pass for loop.
+  // - Move leave animations to be as close as possible to the other animations.
+  // - Block graph construction from progressing until the animation has finished.
+  // Batch boundaries must also be taken into account. The added complexity may not be worth it.
+  for (const deferredAnimation of deferredAnimations) {
+    deferredAnimation();
   }
 }
 
