@@ -14,6 +14,9 @@ html, body {
   height: calc(var(--max-row) * var(--row-height));
   z-index: 2;
 }
+.refs {
+  position: absolute;
+}
 .commit {
   --row: 0;
   --column: 0;
@@ -28,19 +31,34 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
-  transform: translateY(calc(var(--row) * var(--row-height)));
+  transform: translateY(calc(var(--row) * var(--row-height))) translateX(calc(50vw - var(--graph-width) / 2));
   transition-property: transform;
   transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
   z-index: var(--row);
 }
+.commit .refs {
+  display: flex;
+  position: absolute;
+  right: calc(100% - var(--column-width) * var(--column) - var(--column-width) / 3);
+  flex-direction: row;
+  white-space: nowrap;
+  z-index: 2;
+}
 .commit .ref {
   display: inline-block;
-  font-size: 70%;
-  border: 1px solid #000000;
+  font-size: 11px;
+  border: 1px solid rgb(0 0 0 / .3);
   border-radius: 3px;
   padding: 2px 4px;
   margin-right: 2px;
+  background: rgb(255 255 255 / .3);
+}
+@supports (-moz-appearance:none) {
+  /* Firefox-only fix for text bobbing during transitions */
+  .commit .ref {
+    will-change: transform;
+  }
 }
 .commit .graph {
   width: var(--graph-width);
@@ -79,4 +97,5 @@ html, body {
   transition-property: transform;
   transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
+  white-space: nowrap;
 }

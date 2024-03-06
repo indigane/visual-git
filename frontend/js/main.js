@@ -1,7 +1,14 @@
 import './settings.js';
 import socket from './socket.js'
 import * as git from './git-commands.js';
-import { animateCommitEnter, animateEdgesTransition, animateCommitLeave, calculatePointsStringLength } from './animations.js';
+import {
+  animateCommitEnter,
+  animateEdgesTransition,
+  animateCommitLeave,
+  animateRefEnter,
+  animateRefTransition,
+  calculatePointsStringLength,
+} from './animations.js';
 import { parseFullRefPath } from './parsers.js';
 import { asTextContent, debounce, requestIdlePromise } from './utils.js';
 
@@ -67,6 +74,7 @@ class Node {
 
 const commitContextByCommitId = {};
 const commitIdByRowIndex = {};
+const refContextByRefPath = {};
 const previousViewportRowIndices = {
   min: -1,
   max: -1,
@@ -136,6 +144,7 @@ function createCommitElement() {
   commitElement._elems = {
     polylines: [...commitElement.querySelectorAll('polyline')],
     message: commitElement.querySelector('.message'),
+    refsContainer: commitElement.querySelector('.refs'),
   };
   return commitElement;
 }
@@ -166,6 +175,7 @@ function updateCommitElement(commitElement, context, oldContext) {
   if (oldContext?.subject !== context.subject) {
     commitElement._elems.message.textContent = context.subject;
   }
+  commitElement._elems.refsContainer.replaceChildren();
 }
 
 
@@ -210,15 +220,27 @@ function renderVisibleCommits() {
       continue;
     }
     const commitId = commitIdByRowIndex[rowIndex];
-    if (commitId !== undefined) {
-      commitElementPool.get(commitId);
+    if (commitId === undefined) {
+      continue;
     }
+    const commitElement = commitElementPool.get(commitId);
     const commitContext = commitContextByCommitId[commitId];
-    // Render any commit that points to this commit as their parent,
-    // because those nodes have an edge hanging downwards that needs
-    // to be rendered as it connects to this node.
-    for (const childCommitId of commitContext?.childCommitIds ?? []) {
-      commitElementPool.get(childCommitId);
+    if (commitContext !== undefined) {
+      // Render any commit that points to this commit as their parent,
+      // because those nodes have an edge hanging downwards that needs
+      // to be rendered as it connects to this node.
+      for (const childCommitId of commitContext.childCommitIds) {
+        commitElementPool.get(childCommitId);
+      }
+      // Refs
+      let refsHtml = '';
+      for (const fullRefPath of commitContext.refs) {
+        const refHtml = refContextByRefPath[fullRefPath]?.htmlString;
+        refsHtml += refHtml ?? '';
+      }
+      if (refsHtml !== '') {
+        commitElement._elems.refsContainer.innerHTML = refsHtml;
+      }
     }
   }
   previousViewportRowIndices.min = viewportMinRowIndex;
@@ -236,6 +258,7 @@ async function renderCommits({ commits, refs }) {
   const redrawTransitionDurationMs = 1000;
   const maxRow = commits.length - 1;
   const knownCommitIdsForEnterLeaveAnimation = [];
+  const knownRefPathsForEnterLeaveAnimation = [];
   const { viewportMinRowIndex, viewportMaxRowIndex } = getViewportMinMaxRows();
   previousViewportRowIndices.min = viewportMinRowIndex;
   previousViewportRowIndices.max = viewportMaxRowIndex;
@@ -404,9 +427,6 @@ async function renderCommits({ commits, refs }) {
       }
       return `<div class="ref ${asTextContent(refTypeClass)}">${asTextContent(refName)}</div>`;
     }
-    function renderRefs(refsToRender) {
-      return refsToRender.map(renderRef).join('');
-    }
     function getEdges() {
       const xOffset = columnWidth / 2;
       const yOffset = rowHeight / 2;
@@ -476,9 +496,20 @@ async function renderCommits({ commits, refs }) {
       }
       return edges;
     }
+    // Refs
+    const commitRefs = refsForCommitId[commit.id] ?? [];
+    for (const fullRefPath of commitRefs) {
+      const oldRefContext = refContextByRefPath[fullRefPath];
+      const newRefContext = {
+        htmlString: renderRef(fullRefPath),
+        commitId: commit.id,
+        previousCommitId: oldRefContext?.commitId,
+      };
+      refContextByRefPath[fullRefPath] = newRefContext;
+      knownRefPathsForEnterLeaveAnimation.push(fullRefPath);
+    }
     // Node
     const node = nodeForCommitId.get(commit.id);
-    const nodeRefs = refsForCommitId[commit.id] ?? [];
     const color = colors[node.path.columnIndex % colors.length];
     const edges = getEdges();
     const newCommitContext = {
@@ -491,6 +522,7 @@ async function renderCommits({ commits, refs }) {
       edges,
       subject: commit.subject,
       maxColumn,
+      refs: commitRefs,
     };
     const oldCommitContext = commitContextByCommitId[commit.id];
     const isOldCommitElementWithinViewport = isCommitInRange(oldCommitContext, viewportMinRowIndex, viewportMaxRowIndex);
@@ -508,6 +540,20 @@ async function renderCommits({ commits, refs }) {
           // Existing commit element
           updateCommitElement(commitElement, {...newCommitContext, transitionDuration: redrawTransitionDurationMs + 'ms'}, oldCommitContext);
           animateEdgesTransition(commitElement, edges, oldCommitContext.edges, redrawTransitionDurationMs);
+        }
+        // Refs
+        // TODO: Check if context.refs has changed?
+        for (const fullRefPath of newCommitContext.refs) {
+          const refContext = refContextByRefPath[fullRefPath];
+          if (refContext === undefined) {
+            continue;
+          }
+          const refOldCommitContext = refContext.previousCommitId && commitContextByCommitId[refContext.previousCommitId];
+          if (refOldCommitContext === undefined) {
+            animateRefEnter(commitElement, refContext, redrawTransitionDurationMs);
+          } else {
+            animateRefTransition(commitElement, refContext, newCommitContext, refOldCommitContext, redrawTransitionDurationMs);
+          }
         }
       });
     }
