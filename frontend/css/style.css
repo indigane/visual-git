@@ -40,7 +40,11 @@ html, body {
 .commit .refs {
   display: flex;
   position: absolute;
-  right: calc(100% - var(--column-width) * var(--column) - var(--column-width) / 3);
+  right: 100%;
+  transform: translateX(calc(var(--column-width) * var(--column) + var(--column-width) / 3));
+  transition-property: transform;
+  transition-duration: var(--transition-duration, 0);
+  transition-timing-function: ease-in-out;
   flex-direction: row;
   white-space: nowrap;
   z-index: 2;
@@ -88,7 +92,9 @@ html, body {
   stroke-width: var(--stroke-width);
   fill: transparent;
   stroke-dashoffset: calc(-1 * var(--size) / 6.4);
-  transition: stroke var(--transition-duration, 0) ease-in-out;
+  transition-property: d, stroke, stroke-width, stroke-dasharray;
+  transition-duration: var(--transition-duration, 0);
+  transition-timing-function: ease-in-out;
 }
 .commit .message {
   position: absolute;

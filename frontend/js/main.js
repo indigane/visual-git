@@ -3,11 +3,10 @@ import socket from './socket.js'
 import * as git from './git-commands.js';
 import {
   animateCommitEnter,
-  animateEdgesTransition,
   animateCommitLeave,
   animateRefEnter,
   animateRefTransition,
-  calculatePointsStringLength,
+  calculatePathStringLength,
 } from './animations.js';
 import { parseFullRefPath } from './parsers.js';
 import { asTextContent, debounce, requestIdlePromise } from './utils.js';
@@ -142,7 +141,7 @@ function createCommitElement() {
   const commitElement = commitTemplate.content.cloneNode(true).firstElementChild;
   commitsContainer.appendChild(commitElement);
   commitElement._elems = {
-    polylines: [...commitElement.querySelectorAll('polyline')],
+    edges: [...commitElement.querySelectorAll('.edge')],
     message: commitElement.querySelector('.message'),
     refsContainer: commitElement.querySelector('.refs'),
   };
@@ -160,16 +159,16 @@ function updateCommitElement(commitElement, context, oldContext) {
   commitElement.style.setProperty('--color', context.color);
   commitElement.style.setProperty('--max-column', context.maxColumn);
   commitElement.setAttribute('data-commit-id', context.commitId);
-  for (const [index, polyline] of commitElement._elems.polylines.entries()) {
+  for (const [index, edgeElement] of commitElement._elems.edges.entries()) {
     const edge = context.edges[index];
     if (edge) {
-      polyline.style.removeProperty('display');
-      polyline.setAttribute('points', edge.pointsString);
-      polyline.setAttribute('stroke-dasharray', edge.totalLength);
-      polyline.style.stroke = edge.strokeColor;
+      edgeElement.style.removeProperty('display');
+      edgeElement.setAttribute('d', edge.pathString);
+      edgeElement.setAttribute('stroke-dasharray', edge.totalLength);
+      edgeElement.style.stroke = edge.strokeColor;
     }
     else {
-      polyline.style.display = 'none';
+      edgeElement.style.display = 'none';
     }
   }
   if (oldContext?.subject !== context.subject) {
@@ -435,62 +434,62 @@ async function renderCommits({ commits, refs }) {
       for (const [parentIndex, parentId] of commit.parents.entries()) {
         const isPrimaryParent = parentIndex === 0;
         const parentNode = nodeForCommitId.get(parentId);
-        const points = [];
+        const pathCommands = [];
         let strokeColor = colors[0];
         if (parentNode === undefined) {
           // Parent has not been parsed yet. Draw a simple line through the bottom of the graph.
           const startX = node.path.columnIndex;
           const startY = 0;
-          points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
+          pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
           const endX = node.path.columnIndex;
           const endY = maxRow + 1 - node.row;
-          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
           // Duplicate the end point for animations as they require a consistent number of points to transition.
-          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
           strokeColor = colors[node.path.columnIndex % colors.length];
         }
         else if (node.path === parentNode.path) {
           // Edge is within the same path. Draw a simple line.
           const startX = node.path.columnIndex;
           const startY = 0;
-          points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
+          pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
           const endX = parentNode.path.columnIndex;
           const endY = parentNode.row - node.row;
-          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
           // Duplicate the end point for animations as they require a consistent number of points to transition.
-          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
           strokeColor = colors[node.path.columnIndex % colors.length];
         }
         else if (isPrimaryParent) {
           // Edge is converging. Draw a line with a corner.
           const startX = node.path.columnIndex;
           const startY = 0;
-          points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
+          pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
           const cornerX = node.path.columnIndex;
           const cornerY = parentNode.row - node.row;
-          points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight + yOffset - cornerOffset}`);
+          pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset - cornerOffset}`);
           const endX = parentNode.path.columnIndex;
           const endY = parentNode.row - node.row;
-          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
           strokeColor = colors[node.path.columnIndex % colors.length];
         }
         else {
           // Edge is diverging. Draw a line with a corner.
           const startX = node.path.columnIndex;
           const startY = 0;
-          points.push(`${startX * columnWidth + xOffset},${startY * rowHeight + yOffset}`);
+          pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
           const cornerX = parentNode.path.columnIndex;
           const cornerY = 0;
-          points.push(`${cornerX * columnWidth + xOffset},${cornerY * rowHeight + yOffset + cornerOffset}`);
+          pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset + cornerOffset}`);
           const endX = parentNode.path.columnIndex;
           const endY = parentNode.row - node.row;
-          points.push(`${endX * columnWidth + xOffset},${endY * rowHeight + yOffset}`);
+          pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
           strokeColor = colors[parentNode.path.columnIndex % colors.length];
         }
-        const pointsString = [points].join(' ');
+        const pathString = pathCommands.join(' ');
         edges.push({
-          pointsString,
-          totalLength: calculatePointsStringLength(pointsString),
+          pathString,
+          totalLength: calculatePathStringLength(pathString),
           strokeColor,
         });
       }
@@ -539,7 +538,6 @@ async function renderCommits({ commits, refs }) {
         } else {
           // Existing commit element
           updateCommitElement(commitElement, {...newCommitContext, transitionDuration: redrawTransitionDurationMs + 'ms'}, oldCommitContext);
-          animateEdgesTransition(commitElement, edges, oldCommitContext.edges, redrawTransitionDurationMs);
         }
         // Refs
         // TODO: Check if context.refs has changed?
