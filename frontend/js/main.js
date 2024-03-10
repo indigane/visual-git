@@ -505,6 +505,12 @@ async function renderCommits({ commits, refs }) {
     // Refs
     const commitRefs = refsForCommitId[commit.id] ?? [];
     commitRefs.sort((a, b) => {
+      if (a.fullRefPath === 'HEAD') {
+        return 1;
+      }
+      if (b.fullRefPath === 'HEAD') {
+        return -1;
+      }
       // Sort refs alphabetically starting from the last character.
       // So that same refs of different remotes are next to each other.
       const reverseA = a.refName.split('').reverse().join('');
