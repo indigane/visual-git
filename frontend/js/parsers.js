@@ -1,4 +1,4 @@
-import { Commit } from './commit.js';
+import { Commit, Reference } from './commit.js';
 import { splitOnce } from './utils.js';
 
 
@@ -217,17 +217,16 @@ function parseRefsFromDecorateFull(refsRaw, commitId) {
   );
   for (const splitRef of refsRawSplit) {
     let fullRefPath = splitRef;
+    let isPointedToByHEAD = false;
     if (splitRef.startsWith('HEAD -> ')) {
       fullRefPath = splitRef.replace('HEAD -> ', '');
-      refs['HEAD'] = commitId;
-      // TODO: Store fullRefPath instead (symbolic ref)?
+      isPointedToByHEAD = true;
     }
     else if (splitRef.startsWith('tag: ')) {
       fullRefPath = splitRef.replace('tag: ', '');
     }
     const { refType, refName } = parseFullRefPath(fullRefPath);
-    refs[fullRefPath] = commitId;
-    // TODO: Store more metadata?
+    refs[fullRefPath] = new Reference({ fullRefPath, commitId, refType, refName, isPointedToByHEAD });
   }
   return refs;
 }

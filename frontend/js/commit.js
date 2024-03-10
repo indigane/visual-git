@@ -13,3 +13,14 @@ export const Commit = dataclass(class {
   messageBody;
   notes;
 });
+
+
+export class Reference {
+  constructor({ fullRefPath, commitId, refType, refName, isPointedToByHEAD }) {
+    this.fullRefPath = fullRefPath;
+    this.commitId = commitId;
+    this.refType = refType;
+    this.refName = refName;
+    this.isPointedToByHEAD = isPointedToByHEAD ?? false;
+  }
+}

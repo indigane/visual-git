@@ -8,7 +8,6 @@ import {
   animateRefTransition,
   calculatePathStringLength,
 } from './animations.js';
-import { parseFullRefPath } from './parsers.js';
 import { asTextContent, debounce, requestIdlePromise } from './utils.js';
 
 
@@ -233,8 +232,8 @@ function renderVisibleCommits() {
       }
       // Refs
       let refsHtml = '';
-      for (const fullRefPath of commitContext.refs) {
-        const refHtml = refContextByRefPath[fullRefPath]?.htmlString;
+      for (const ref of commitContext.refs) {
+        const refHtml = refContextByRefPath[ref.fullRefPath]?.htmlString;
         refsHtml += refHtml ?? '';
       }
       if (refsHtml !== '') {
@@ -268,11 +267,11 @@ async function renderCommits({ commits, refs }) {
 
   // Reverse mapping for refs
   const refsForCommitId = {};
-  for (const [refPath, commitId] of Object.entries(refs)) {
-    if (refsForCommitId[commitId] === undefined) {
-      refsForCommitId[commitId] = [];
+  for (const ref of Object.values(refs)) {
+    if (refsForCommitId[ref.commitId] === undefined) {
+      refsForCommitId[ref.commitId] = [];
     }
-    refsForCommitId[commitId].push(refPath);
+    refsForCommitId[ref.commitId].push(ref);
   }
 
   // Collect paths of nodes
@@ -415,16 +414,18 @@ async function renderCommits({ commits, refs }) {
     if (isBatchSizeReached) {
       await requestIdlePromise(maxWaitMs);
     }
-    function renderRef(fullRefPath) {
-      const { refType, refName } = parseFullRefPath(fullRefPath);
+    function renderRef(ref) {
       let refTypeClass;
-      if (refType === null) {
+      if (ref.refType === null) {
         refTypeClass = 'special-ref';
+      } else {
+        refTypeClass = `ref-${ref.refType}`;
       }
-      else {
-        refTypeClass = `ref-${refType}`;
+      let refName = asTextContent(ref.refName);
+      if (ref.isPointedToByHEAD) {
+        refName = 'HEAD &rarr; ' + refName;
       }
-      return `<div class="ref ${asTextContent(refTypeClass)}">${asTextContent(refName)}</div>`;
+      return `<div class="ref ${asTextContent(refTypeClass)}">${refName}</div>`;
     }
     function getEdges() {
       const xOffset = columnWidth / 2;
@@ -497,15 +498,22 @@ async function renderCommits({ commits, refs }) {
     }
     // Refs
     const commitRefs = refsForCommitId[commit.id] ?? [];
-    for (const fullRefPath of commitRefs) {
-      const oldRefContext = refContextByRefPath[fullRefPath];
+    commitRefs.sort((a, b) => {
+      // Sort refs alphabetically starting from the last character.
+      // So that same refs of different remotes are next to each other.
+      const reverseA = a.refName.split('').reverse().join('');
+      const reverseB = b.refName.split('').reverse().join('');
+      return reverseA.localeCompare(reverseB);
+    });
+    for (const ref of commitRefs) {
+      const oldRefContext = refContextByRefPath[ref.fullRefPath];
       const newRefContext = {
-        htmlString: renderRef(fullRefPath),
-        commitId: commit.id,
-        previousCommitId: oldRefContext?.commitId,
+        ref,
+        htmlString: renderRef(ref),
+        previousCommitId: oldRefContext?.ref.commitId,
       };
-      refContextByRefPath[fullRefPath] = newRefContext;
-      knownRefPathsForEnterLeaveAnimation.push(fullRefPath);
+      refContextByRefPath[ref.fullRefPath] = newRefContext;
+      knownRefPathsForEnterLeaveAnimation.push(ref.fullRefPath);
     }
     // Node
     const node = nodeForCommitId.get(commit.id);
@@ -541,8 +549,8 @@ async function renderCommits({ commits, refs }) {
         }
         // Refs
         // TODO: Check if context.refs has changed?
-        for (const fullRefPath of newCommitContext.refs) {
-          const refContext = refContextByRefPath[fullRefPath];
+        for (const ref of newCommitContext.refs) {
+          const refContext = refContextByRefPath[ref.fullRefPath];
           if (refContext === undefined) {
             continue;
           }
