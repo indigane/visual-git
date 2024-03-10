@@ -40,23 +40,32 @@ html, body {
 .commit .refs {
   display: flex;
   position: absolute;
-  right: 100%;
-  transform: translateX(calc(var(--column-width) * var(--column) + var(--column-width) / 3));
-  transition-property: transform;
-  transition-duration: var(--transition-duration, 0);
-  transition-timing-function: ease-in-out;
-  flex-direction: row;
+  right: calc(100% - var(--column-width) / 3);
+  /* flex-direction: row; */
+
+  flex-direction: column;
+  align-items: flex-end;
+  transform: translateX(-30px);
+
   white-space: nowrap;
   z-index: 2;
 }
 .commit .ref {
   display: inline-block;
   font-size: 11px;
-  border: 1px solid rgb(0 0 0 / .3);
-  border-radius: 3px;
+  /* border: 1px solid rgb(0 0 0 / .3); */
+  border: 1px solid #b2b2b2;
+  border-radius: 3px 0 0 3px;
   padding: 2px 4px;
-  margin-right: 2px;
+  margin-top: -1px;
   background: rgb(255 255 255 / .3);
+}
+.commit .ref:first-of-type {
+  margin-top: 0;
+  border-top-right-radius: 3px;
+}
+.commit .ref:last-of-type {
+  border-bottom-right-radius: 3px;
 }
 @supports (-moz-appearance:none) {
   /* Firefox-only fix for text bobbing during transitions */

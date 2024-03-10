@@ -239,6 +239,25 @@ function renderVisibleCommits() {
       }
       if (refsHtml !== '') {
         commitElement._elems.refsContainer.innerHTML = refsHtml;
+        let svgStr = '<svg style="width: 18px; height: 18px; position: absolute; top: 0; left: 100%; overflow: visible;">';
+        const refHeight = 18;
+        const columnWidth = 32;
+        const count = commitElement._elems.refsContainer.childElementCount;
+        const endY = count / 2 * refHeight + 0.5;
+        const offsetX = 30;
+        const endX = commitContext.column * columnWidth + offsetX;
+        for (let n = 0; n < count; n++) {
+          // svgStr += `<path d="M 0 ${(n + 0.5) * 19} Q 0 ${(count / 2) * 19} 100 ${(count / 2) * 19}" stroke="#b2b2b2" fill="transparent"/>`;
+          const startX = 0;
+          const startY = (n + 0.5) * refHeight + 0.5;
+          // Curve control points
+          const point1X = endX / 4;
+          const point1Y = startY;
+          const point2X = offsetX / 2;
+          const point2Y = endY;
+          svgStr += `<path d="M ${startX} ${startY} C ${point1X} ${point1Y} ${point2X} ${point2Y} ${endX} ${endY}" stroke="#b2b2b2" fill="transparent"/>`;
+        }
+        commitElement._elems.refsContainer.insertAdjacentHTML('beforeend', svgStr);
       }
     }
   }
@@ -497,6 +516,15 @@ async function renderCommits({ commits, refs }) {
     }
     // Refs
     const commitRefs = refsForCommitId[commit.id] ?? [];
+    commitRefs.sort((a, b) => {
+      // Sort refs alphabetically starting from the last character.
+      // So that same refs of different remotes are next to each other.
+      const { refName: refNameA } = parseFullRefPath(a);
+      const { refName: refNameB } = parseFullRefPath(b);
+      const reverseA = refNameA.split('').reverse().join('');
+      const reverseB = refNameB.split('').reverse().join('');
+      return reverseA.localeCompare(reverseB);
+    });
     for (const fullRefPath of commitRefs) {
       const oldRefContext = refContextByRefPath[fullRefPath];
       const newRefContext = {
