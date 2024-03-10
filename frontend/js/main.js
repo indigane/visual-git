@@ -415,17 +415,21 @@ async function renderCommits({ commits, refs }) {
       await requestIdlePromise(maxWaitMs);
     }
     function renderRef(ref) {
+      const rightArrow = '\u2192';
+      const displayNameForHEAD = `YOU ARE HERE ${rightArrow}`;
       let refTypeClass;
       if (ref.refType === null) {
         refTypeClass = 'special-ref';
       } else {
         refTypeClass = `ref-${ref.refType}`;
       }
-      let refName = asTextContent(ref.refName);
-      if (ref.isPointedToByHEAD) {
-        refName = 'HEAD &rarr; ' + refName;
+      let refName = ref.refName;
+      if (ref.refName === 'HEAD') {
+        refName = displayNameForHEAD;
+      } else if (ref.isPointedToByHEAD) {
+        refName = `${displayNameForHEAD} ${refName}`;
       }
-      return `<div class="ref ${asTextContent(refTypeClass)}">${refName}</div>`;
+      return `<div class="ref ${asTextContent(refTypeClass)}">${asTextContent(refName)}</div>`;
     }
     function getEdges() {
       const xOffset = columnWidth / 2;
