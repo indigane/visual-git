@@ -233,8 +233,16 @@ function renderVisibleCommits() {
       // Refs
       let refsHtml = '';
       for (const ref of commitContext.refs) {
-        const refHtml = refContextByRefPath[ref.fullRefPath]?.htmlString;
-        refsHtml += refHtml ?? '';
+        const refContext = refContextByRefPath[ref.fullRefPath];
+        if (refContext === undefined) {
+          continue;
+        }
+        if (refContext.ref.isSymbolic) {
+          // Skip HEAD if it is symbolic, since it will be rendered inside another ref.
+          continue;
+        }
+        const refHtml = refContext.htmlString;
+        refsHtml += refHtml;
       }
       if (refsHtml !== '') {
         commitElement._elems.refsContainer.innerHTML = refsHtml;
@@ -564,6 +572,10 @@ async function renderCommits({ commits, refs }) {
         for (const ref of newCommitContext.refs) {
           const refContext = refContextByRefPath[ref.fullRefPath];
           if (refContext === undefined) {
+            continue;
+          }
+          if (refContext.ref.isSymbolic) {
+            // Skip HEAD if it is symbolic, since it will be rendered inside another ref.
             continue;
           }
           const refOldCommitContext = refContext.previousCommitId && commitContextByCommitId[refContext.previousCommitId];

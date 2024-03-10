@@ -16,11 +16,12 @@ export const Commit = dataclass(class {
 
 
 export class Reference {
-  constructor({ fullRefPath, commitId, refType, refName, isPointedToByHEAD }) {
+  constructor({ fullRefPath, commitId, refType, refName, isPointedToByHEAD, isSymbolic }) {
     this.fullRefPath = fullRefPath;
     this.commitId = commitId;
     this.refType = refType;
     this.refName = refName;
     this.isPointedToByHEAD = isPointedToByHEAD ?? false;
+    this.isSymbolic = isSymbolic ?? false;
   }
 }

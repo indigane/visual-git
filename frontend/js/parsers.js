@@ -220,6 +220,7 @@ function parseRefsFromDecorateFull(refsRaw, commitId) {
     let isPointedToByHEAD = false;
     if (splitRef.startsWith('HEAD -> ')) {
       fullRefPath = splitRef.replace('HEAD -> ', '');
+      refs['HEAD'] = new Reference({ fullRefPath: 'HEAD', commitId, refType: 'HEAD', refName: 'HEAD', isSymbolic: true });
       isPointedToByHEAD = true;
     }
     else if (splitRef.startsWith('tag: ')) {
