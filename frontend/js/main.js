@@ -416,20 +416,22 @@ async function renderCommits({ commits, refs }) {
     }
     function renderRef(ref) {
       const rightArrow = '\u2192';
-      const displayNameForHEAD = `YOU ARE HERE ${rightArrow}`;
+      const displayNameForHEAD = `<strong style="color: green;">YOU ARE HERE ${rightArrow}</strong>`;
+      let refName = asTextContent(ref.refName);
       let refTypeClass;
       if (ref.refType === null) {
         refTypeClass = 'special-ref';
       } else {
         refTypeClass = `ref-${ref.refType}`;
       }
-      let refName = ref.refName;
       if (ref.refName === 'HEAD') {
         refName = displayNameForHEAD;
+      } else if (ref.refType === 'stash') {
+        refName = '<em>Your latest stash</em>';
       } else if (ref.isPointedToByHEAD) {
         refName = `${displayNameForHEAD} ${refName}`;
       }
-      return `<div class="ref ${asTextContent(refTypeClass)}">${asTextContent(refName)}</div>`;
+      return `<div class="ref ${asTextContent(refTypeClass)}">${refName}</div>`;
     }
     function getEdges() {
       const xOffset = columnWidth / 2;

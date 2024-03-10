@@ -52,11 +52,11 @@ html, body {
 .commit .ref {
   display: inline-block;
   font-size: 11px;
-  border: 1px solid rgb(0 0 0 / .3);
+  border: 1px solid rgb(0 0 0 / .15);
   border-radius: 3px;
   padding: 2px 4px;
   margin-right: 2px;
-  background: rgb(255 255 255 / .3);
+  background: rgb(255 255 255 / .6);
 }
 @supports (-moz-appearance:none) {
   /* Firefox-only fix for text bobbing during transitions */
