@@ -7,4 +7,9 @@ PATH_TO_NODE="$DIR/../runtime/node"
 
 PATH_TO_INDEX_JS="$DIR/../backend/index.js"
 
+if [ ! -f "$PATH_TO_NODE" ]; then
+  echo "Node executable not found. Please place node in the runtime/ directory."
+  exit 1
+fi
+
 nohup "$PATH_TO_NODE" "$PATH_TO_INDEX_JS" "$@" > /dev/null 2>&1 &
