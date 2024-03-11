@@ -56,7 +56,25 @@ html, body {
   border-radius: 3px;
   padding: 2px 4px;
   margin-right: 2px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: rgb(255 255 255 / .6);
+  transition-property: margin, border-color, padding;
+  transition-duration: var(--transition-duration, 0);
+  transition-timing-function: ease-in-out;
+}
+.commit .ref-HEAD:not(:last-of-type) {
+  margin-right: -2px;
+  border-right-color: rgb(0 0 0 / 0);
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.commit .ref-HEAD + .ref {
+  border-left-color: rgb(0 0 0 / 0);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding-left: 0;
 }
 @supports (-moz-appearance:none) {
   /* Firefox-only fix for text bobbing during transitions */

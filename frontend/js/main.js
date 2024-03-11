@@ -237,10 +237,6 @@ function renderVisibleCommits() {
         if (refContext === undefined) {
           continue;
         }
-        if (refContext.ref.isSymbolic) {
-          // Skip HEAD if it is symbolic, since it will be rendered inside another ref.
-          continue;
-        }
         const refHtml = refContext.htmlString;
         refsHtml += refHtml;
       }
@@ -424,8 +420,8 @@ async function renderCommits({ commits, refs }) {
     }
     function renderRef(ref) {
       const rightArrow = '\u2192';
-      const displayNameForHEAD = `<strong style="color: green;">YOU ARE HERE ${rightArrow}</strong>`;
       let refName = asTextContent(ref.refName);
+      let refTitle = refName;
       let refTypeClass;
       if (ref.refType === null) {
         refTypeClass = 'special-ref';
@@ -433,13 +429,13 @@ async function renderCommits({ commits, refs }) {
         refTypeClass = `ref-${ref.refType}`;
       }
       if (ref.refName === 'HEAD') {
-        refName = displayNameForHEAD;
+        refName = `<strong style="color: green;">YOU ARE HERE ${rightArrow}</strong>`;
+        refTitle = '';
       } else if (ref.refType === 'stash') {
         refName = '<em>Your latest stash</em>';
-      } else if (ref.isPointedToByHEAD) {
-        refName = `${displayNameForHEAD} ${refName}`;
+        refTitle = '';
       }
-      return `<div class="ref ${asTextContent(refTypeClass)}">${refName}</div>`;
+      return `<div class="ref ${asTextContent(refTypeClass)}" title="${refTitle}">${refName}</div>`;
     }
     function getEdges() {
       const xOffset = columnWidth / 2;
@@ -513,17 +509,32 @@ async function renderCommits({ commits, refs }) {
     // Refs
     const commitRefs = refsForCommitId[commit.id] ?? [];
     commitRefs.sort((a, b) => {
-      if (a.fullRefPath === 'HEAD') {
+      let refTypeA = a.refType;
+      let refTypeB = b.refType;
+      if (a.isPointedToByHEAD && b.refType === 'HEAD') {
         return 1;
       }
-      if (b.fullRefPath === 'HEAD') {
+      if (b.isPointedToByHEAD && a.refType === 'HEAD') {
         return -1;
       }
-      // Sort refs alphabetically starting from the last character.
-      // So that same refs of different remotes are next to each other.
-      const reverseA = a.refName.split('').reverse().join('');
-      const reverseB = b.refName.split('').reverse().join('');
-      return reverseA.localeCompare(reverseB);
+      if (a.isPointedToByHEAD) {
+        refTypeA = 'HEAD';
+      }
+      if (b.isPointedToByHEAD) {
+        refTypeB = 'HEAD';
+      }
+      const refTypeOrder = {
+        'HEAD': 0,
+        'tags': 1,
+        'heads': 2,
+        'remotes': 3,
+      };
+      const refTypeOrderOther = 4;
+      const refTypeOrderResult = (refTypeOrder[refTypeB] ?? refTypeOrderOther) - (refTypeOrder[refTypeA] ?? refTypeOrderOther);
+      if (refTypeOrderResult !== 0) {
+        return refTypeOrderResult;
+      }
+      return a.refName.localeCompare(b.refName);
     });
     for (const ref of commitRefs) {
       const oldRefContext = refContextByRefPath[ref.fullRefPath];
@@ -572,10 +583,6 @@ async function renderCommits({ commits, refs }) {
         for (const ref of newCommitContext.refs) {
           const refContext = refContextByRefPath[ref.fullRefPath];
           if (refContext === undefined) {
-            continue;
-          }
-          if (refContext.ref.isSymbolic) {
-            // Skip HEAD if it is symbolic, since it will be rendered inside another ref.
             continue;
           }
           const refOldCommitContext = refContext.previousCommitId && commitContextByCommitId[refContext.previousCommitId];
