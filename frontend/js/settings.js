@@ -3,7 +3,7 @@ import { elementEvent } from './utils.js';
 
 const DEFAULT_SETTINGS = {
   'branchVisibility': 'currentBranch',
-  'maxCommits': 50000,
+  'maxCommits': 1000,
 };
 
 const validation = {
