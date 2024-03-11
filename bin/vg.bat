@@ -8,6 +8,12 @@ IF NOT EXIST "%PATH_TO_NODE%" (
   exit /b
 )
 
+REM Attempt to get the path to the .git dir. If it fails, output the error, otherwise continue.
+git rev-parse --absolute-git-dir >NUL 2>&1 || (
+  git rev-parse --absolute-git-dir 2>&1
+  exit /b
+)
+
 REM Attempt to run vg.vbs, which can hide the window.
 cscript //B //Nologo "%PATH_TO_VBS%" %*
 IF ERRORLEVEL 1 (
