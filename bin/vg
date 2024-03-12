@@ -13,7 +13,7 @@ if [ ! -f "$PATH_TO_NODE" ]; then
 fi
 
 # Attempt to get the path to the .git dir. If it fails, output the error, otherwise continue.
-if ! error_output=$(git rev-parse --absolute-git-dir 2>&1 > /dev/null); then
+if ! error_output=$(git -C "$1" rev-parse --absolute-git-dir 2>&1 > /dev/null); then
   echo "$error_output"
   exit 1
 fi
