@@ -2,7 +2,7 @@
 import { elementEvent } from './utils.js';
 
 const DEFAULT_SETTINGS = {
-  'branchVisibility': 'currentBranch',
+  'branchVisibility': 'allRefs',
   'maxCommits': 1000,
 };
 
