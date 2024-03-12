@@ -1,19 +1,27 @@
 html, body {
   font-family: sans-serif;
 }
-.graph {
+.graph-container {
   position: relative;
 }
 .commits {
   position: relative;
+  contain: size layout style;
   --max-column: 1;
+  --column-width: 32px;
+  --row-height: 32px;
+  --max-row: 1;
+  height: calc(var(--max-row) * var(--row-height));
   z-index: 2;
+}
+.refs {
+  position: absolute;
 }
 .commit {
   --row: 0;
   --column: 0;
-  --column-width: 2em;
-  --row-height: 2em;
+  --max-graph-width: 50vw;
+  --graph-width: min(calc(var(--column-width) * var(--max-column)), var(--max-graph-width));
   contain: size layout style;
   display: flex;
   flex-direction: row;
@@ -23,19 +31,58 @@ html, body {
   position: absolute;
   top: 0;
   left: 0;
-  transform: translateY(calc(var(--row) * var(--row-height)));
+  transform: translateY(calc(var(--row) * var(--row-height))) translateX(calc(50vw - var(--graph-width) / 2));
+  transition-property: transform;
+  transition-duration: var(--transition-duration, 0);
+  transition-timing-function: ease-in-out;
+  z-index: var(--row);
+}
+.commit .refs {
+  display: flex;
+  position: absolute;
+  right: 100%;
+  transform: translateX(calc(var(--column-width) * var(--column) + var(--column-width) / 3));
+  transition-property: transform;
+  transition-duration: var(--transition-duration, 0);
+  transition-timing-function: ease-in-out;
+  flex-direction: row;
+  white-space: nowrap;
+  z-index: 2;
 }
 .commit .ref {
   display: inline-block;
-  font-size: 70%;
-  border: 1px solid #000000;
+  font-size: 11px;
+  border: 1px solid rgb(0 0 0 / .15);
   border-radius: 3px;
   padding: 2px 4px;
   margin-right: 2px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgb(255 255 255 / .6);
+  transition-property: margin, border-color, padding;
+  transition-duration: var(--transition-duration, 0);
+  transition-timing-function: ease-in-out;
+}
+.commit .ref-HEAD:not(:last-of-type) {
+  margin-right: -2px;
+  border-right-color: rgb(0 0 0 / 0);
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.commit .ref-HEAD + .ref {
+  border-left-color: rgb(0 0 0 / 0);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding-left: 0;
+}
+@supports (-moz-appearance:none) {
+  /* Firefox-only fix for text bobbing during transitions */
+  .commit .ref {
+    will-change: transform;
+  }
 }
 .commit .graph {
-  --max-graph-width: 50vw;
-  --graph-width: min(calc(var(--column-width) * var(--max-column)), var(--max-graph-width));
   width: var(--graph-width);
   min-width: var(--graph-width);
   height: var(--row-height);
@@ -43,29 +90,36 @@ html, body {
 .commit .graph svg {
   --size: var(--row-height);
   --offset-left: calc(var(--column-width) * var(--column));
-  width: 32px;
-  height: 32px;
+  width: var(--size);
+  height: var(--size);
   overflow: visible;
 }
 .commit .graph circle {
-  fill: currentColor;
+  --radius: calc(var(--size) / 10);
+  fill: var(--color, currentColor);
   cx: calc(var(--size) / 2 + var(--offset-left));
   cy: calc(var(--size) / 2);
-  r: calc(var(--size) / 10);
+  r: var(--radius);
+  transition-property: fill, cx, cy;
+  transition-duration: var(--transition-duration, 0);
+  transition-timing-function: ease-in-out;
 }
-
-.edges {
-  position: absolute;
-  top: 0px;
-  left: 0px;
-  width: 32px;
-  height: 32px;
-  overflow: visible;
-  z-index: 1;
-}
-.edges polyline {
+.commit .graph .edge {
+  --stroke-width: calc(var(--size) / 16);
   stroke: black;
-  stroke-width: 2px;
+  stroke-width: var(--stroke-width);
   fill: transparent;
-  stroke-dashoffset: -5px;
+  stroke-dashoffset: calc(-1 * var(--size) / 6.4);
+  transition-property: d, stroke, stroke-width, stroke-dasharray;
+  transition-duration: var(--transition-duration, 0);
+  transition-timing-function: ease-in-out;
+}
+.commit .message {
+  position: absolute;
+  left: 0;
+  transform: translateX(var(--graph-width));
+  transition-property: transform;
+  transition-duration: var(--transition-duration, 0);
+  transition-timing-function: ease-in-out;
+  white-space: nowrap;
 }

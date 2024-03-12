@@ -7,4 +7,15 @@ PATH_TO_NODE="$DIR/../runtime/node"
 
 PATH_TO_INDEX_JS="$DIR/../backend/index.js"
 
+if [ ! -f "$PATH_TO_NODE" ]; then
+  echo "Node executable not found. Please place node in the runtime/ directory."
+  exit 1
+fi
+
+# Attempt to get the path to the .git dir. If it fails, output the error, otherwise continue.
+if ! error_output=$(git rev-parse --absolute-git-dir 2>&1 > /dev/null); then
+  echo "$error_output"
+  exit 1
+fi
+
 nohup "$PATH_TO_NODE" "$PATH_TO_INDEX_JS" "$@" > /dev/null 2>&1 &

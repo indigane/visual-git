@@ -20,14 +20,27 @@
         </label>
         <label>
           <input type="radio" name="branchVisibility" value="allRefsHistory">
-          EVERYTHING
+          Deleted commits too
         </label>
       </div>
     </vg-settings>
-    <div class="graph">
+    <div class="graph-container">
       <div class="commits"></div>
-      <svg class="edges"></svg>
+      <div class="refs"></div>
     </div>
+    <template id="commit-template">
+      <div class="commit" style="--transition-duration: 0s; display: none;">
+        <div class="graph">
+          <svg>
+            <circle></circle>
+            <path class="edge"></path>
+            <path class="edge"></path>
+          </svg>
+        </div>
+        <div class="message"></div>
+        <div class="refs"></div>
+      </div>
+    </template>
     <script src="js/reconnecting-websocket.min.js"></script>
     <script src="js/main.js" type="module"></script>
   </body>

@@ -67,3 +67,19 @@ export function documentEvent(eventName, eventData) {
     eventData,
   );
 }
+
+
+export function animate(element, ...args) {
+  if (element._currentAnimation !== undefined) {
+    element._currentAnimation.cancel();
+  }
+  element._currentAnimation = element.animate(...args);
+  element._currentAnimation.finished
+  .then(() => {
+    element._currentAnimation = undefined;
+  })
+  .catch(() => {
+    // The animation was canceled.
+  });
+  return element._currentAnimation;
+}
