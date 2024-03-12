@@ -37,6 +37,12 @@ html, body {
   transition-timing-function: ease-in-out;
   z-index: var(--row);
 }
+@supports (width: round(1px, 1px)) {
+  /* Fix blurry SVG for browsers that support round() */
+  .commit {
+    transform: translateY(calc(var(--row) * var(--row-height))) translateX(calc(round(50vw - var(--graph-width) / 2, 1px)));
+  }
+}
 .commit .refs {
   display: flex;
   position: absolute;
