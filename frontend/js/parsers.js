@@ -178,13 +178,13 @@ function parseLogRawHeaders(headerChunk) {
       const { name, email, timestamp, _timeOffset } = LOG_RAW_PERSON_REGEX.exec(headerValue).groups;
       headers.authorName = name;
       headers.authorEmail = email;
-      headers.authorDate = new Date(timestamp * 1000);
+      headers.authorDate = new Date(parseInt(timestamp) * 1000);
     }
     else if (headerName === 'committer') {
       const { name, email, timestamp, _timeOffset } = LOG_RAW_PERSON_REGEX.exec(headerValue).groups;
       headers.committerName = name;
       headers.committerEmail = email;
-      headers.committerDate = new Date(timestamp * 1000);
+      headers.committerDate = new Date(parseInt(timestamp) * 1000);
     }
   }
   return headers;

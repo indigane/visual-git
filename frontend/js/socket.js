@@ -1,2 +1,2 @@
-
-export default new ReconnectingWebSocket(`ws://${window.location.host}`);
+/** @type {WebSocket} */
+export default new globalThis.ReconnectingWebSocket(`ws://${window.location.host}`);

@@ -1,4 +1,3 @@
-import './settings.js';
 import socket from './socket.js'
 import * as git from './git-commands.js';
 import {
@@ -8,6 +7,7 @@ import {
   animateRefTransition,
   calculatePathStringLength,
 } from './animations.js';
+import { SettingsContainerElement } from './settings.js';
 import { asTextContent, debounce, requestIdlePromise } from './utils.js';
 
 
@@ -15,6 +15,7 @@ class Path {
   constructor({nodes}) {
     this.nodes = nodes;
     this.columnIndex = undefined;
+    this.mergeCount = 0;
   }
   getId() {
     return this.nodes[0].commit.id;
@@ -134,10 +135,22 @@ const commitElementPool = {
 };
 
 
+/**
+ * @typedef {HTMLElement & {
+ *   _elems: {
+ *     edges: (Element | null)[]
+ *     message: Element | null
+ *     refsContainer: Element | null
+ *   }
+ * }} CommitElement
+ */
+
+/** @type {HTMLTemplateElement} */
 const commitTemplate = document.querySelector('#commit-template');
 const commitsContainer = document.querySelector('.commits');
 function createCommitElement() {
-  const commitElement = commitTemplate.content.cloneNode(true).firstElementChild;
+  const clonedFragment = /** @type {DocumentFragment} */ (commitTemplate.content.cloneNode(true));
+  const commitElement = /** @type {CommitElement} */ (clonedFragment.firstElementChild);
   commitsContainer.appendChild(commitElement);
   commitElement._elems = {
     edges: [...commitElement.querySelectorAll('.edge')],
@@ -251,6 +264,7 @@ function renderVisibleCommits() {
 
 
 async function renderCommits({ commits, refs }) {
+  /** @type {HTMLElement} */
   const commitsContainer = document.querySelector('.commits');
   //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
   //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
@@ -267,7 +281,7 @@ async function renderCommits({ commits, refs }) {
 
   commitsContainer.style.setProperty('--column-width', columnWidth + 'px');
   commitsContainer.style.setProperty('--row-height', rowHeight + 'px');
-  commitsContainer.style.setProperty('--max-row', maxRow);
+  commitsContainer.style.setProperty('--max-row', maxRow.toString());
 
   // Reverse mapping for refs
   const refsForCommitId = {};
@@ -629,6 +643,7 @@ async function renderCommits({ commits, refs }) {
 
 
 function main() {
+  /** @type {SettingsContainerElement} */
   const settings = document.querySelector('vg-settings');
 
   getCommitsAndRender();

@@ -11,18 +11,20 @@ const validation = {
   'maxCommits': Number.isInteger,
 };
 
-class SettingsContainerElement extends HTMLElement {
+export class SettingsContainerElement extends HTMLElement {
   constructor() {
     super();
     this.userSettings = {};
     this.repositorySettings = {};
   }
   connectedCallback() {
+    const settings = this;
     this.addEventListener('change', function handleChange(event) {
-      const name = event.target.getAttribute('name');
-      const oldValue = this.userSettings[name];
-      const newValue = event.target.value;
-      this.userSettings[name] = newValue;
+      const inputElement = /** @type {HTMLInputElement} */ (this);
+      const name = inputElement.getAttribute('name');
+      const oldValue = settings.userSettings[name];
+      const newValue = inputElement.value;
+      settings.userSettings[name] = newValue;
       elementEvent(this, 'setting-change', { name, oldValue, newValue });
     });
   }
@@ -38,21 +40,21 @@ class SettingsContainerElement extends HTMLElement {
   validate(name, value) {
     const validator = validation[name];
     if (validator === undefined) {
-      console.warning(`Unknown setting ${name}`);
+      console.warn(`Unknown setting ${name}`);
       return false;
     }
     else if (Array.isArray(validator)) {
       if (validator.includes(value)) {
         return true;
       }
-      console.warning(`"${value}" is not a valid value for ${name}. Valid values: ${validator.join(', ')}`);
+      console.warn(`"${value}" is not a valid value for ${name}. Valid values: ${validator.join(', ')}`);
       return false;
     }
     else if (validator instanceof Function) {
       if (validator(value)) {
         return true;
       }
-      console.warning(`"${value}" is not a valid value for ${name}.`);
+      console.warn(`"${value}" is not a valid value for ${name}.`);
       return false;
     }
   }
