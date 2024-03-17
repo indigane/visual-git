@@ -1,5 +1,6 @@
-import { Commit, Reference } from './commit.js';
-import { splitOnce } from './utils.js';
+import Commit from '../models/commit.js';
+import Reference from '../models/reference.js';
+import { splitOnce } from '../utils.js';
 
 
 export const customLogFormatString = (() => {

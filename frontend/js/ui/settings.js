@@ -1,5 +1,5 @@
 
-import { elementEvent } from './utils.js';
+import { elementEvent } from '../utils.js';
 
 /**
  * @typedef {Object} Settings
@@ -18,7 +18,7 @@ const validation = {
   'maxCommits': Number.isInteger,
 };
 
-export class SettingsContainerElement extends HTMLElement {
+export class SettingsElement extends HTMLElement {
   constructor() {
     super();
     /** @type {Partial<Settings>} */
@@ -75,4 +75,4 @@ export class SettingsContainerElement extends HTMLElement {
   }
 }
 
-customElements.define('vg-settings', SettingsContainerElement);
+customElements.define('vg-settings', SettingsElement);

@@ -1,4 +1,4 @@
-import { animate } from './utils.js';
+import { animate } from '../utils.js';
 
 
 function distanceBetweenPoints(x1, y1, x2, y2) {
