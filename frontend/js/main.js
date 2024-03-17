@@ -7,12 +7,14 @@ import {
   animateRefTransition,
   calculatePathStringLength,
 } from './animations.js';
+import { Commit, Reference } from './commit.js';
 import { SettingsContainerElement } from './settings.js';
 import { asTextContent, debounce, requestIdlePromise } from './utils.js';
 
 
 class Path {
   constructor({nodes}) {
+    /** @type {Node[]} */
     this.nodes = nodes;
     this.columnIndex = undefined;
     this.mergeCount = 0;
@@ -52,6 +54,7 @@ class Path {
     const lastNode = this.nodes.slice(-1)[0];
     return lastNode.parents[0]?.path;
   }
+  /** @param {Path} pathB Compare pathA to pathB for path priority */
   compare(pathB) {
     // In the future this should also check branch order (main, develop, features, etc)
     const pathA = this;
@@ -61,6 +64,10 @@ class Path {
 
 
 class Node {
+  /** @type {Commit} */ commit;
+  /** @type {Path} */ path;
+  /** @type {Node[]} */ children;
+  /** @type {Node[]} */ parents;
   constructor({commit, path, row}) {
     this.commit = commit;
     this.path = path;
@@ -71,9 +78,9 @@ class Node {
 }
 
 
-const commitContextByCommitId = {};
-const commitIdByRowIndex = {};
-const refContextByRefPath = {};
+/** @type {Object.<string, CommitContext>} */ const commitContextByCommitId = {};
+/** @type {Object.<number, string>} */ const commitIdByRowIndex = {};
+/** @type {Object.<string, ReferenceContext>} */ const refContextByRefPath = {};
 const previousViewportRowIndices = {
   min: -1,
   max: -1,
@@ -83,6 +90,7 @@ const previousViewportRowIndices = {
 const commitElementPool = {
   elementsByCommitId: {},
   index: 0,
+  /** @type {CommitElement[]} */
   pool: [],
   getNext: function () {
     const { viewportMinRowIndex, viewportMaxRowIndex } = getViewportMinMaxRows();
@@ -134,14 +142,47 @@ const commitElementPool = {
   },
 };
 
+/**
+ * Context data for rendering a CommitElement.
+ * @typedef {Object} CommitContext
+ * @property {number} row The row index.
+ * @property {number} column The column index.
+ * @property {string} color The CSS color of the node and edges.
+ * @property {string} commitId The ID of the commit.
+ * @property {string[]} childCommitIds The IDs of the child commits.
+ * @property {number[]} parentCommitRows The row indices of the parent commits.
+ * @property {EdgeContext[]} edges The context for the edges.
+ * @property {string} subject The subject of the commit.
+ * @property {number} maxColumn The maximum column index.
+ * @property {Reference[]} refs The references pointing to this commit.
+ * @property {string} [transitionDuration] The duration of transition animation as CSS duration string.
+ */
+
+/**
+ * Context data for rendering an edge of a CommitElement.
+ * @typedef {Object} EdgeContext
+ * @property {string} pathString The path string (`d`).
+ * @property {number} totalLength The total length of the path.
+ * @property {string} strokeColor The CSS color of the stroke.
+ */
+
+/**
+ * Context data for rendering a Reference.
+ * @typedef {Object} ReferenceContext
+ * @property {Reference} ref - The reference object.
+ * @property {string} htmlString - The HTML string representation of the reference.
+ * @property {string} [previousCommitId] - The commit ID of a previous ref, if available.
+ */
 
 /**
  * @typedef {HTMLElement & {
  *   _elems: {
- *     edges: (Element | null)[]
+ *     edges: (SVGElement | null)[]
  *     message: Element | null
  *     refsContainer: Element | null
  *   }
+ *   _boundCommitId: string
+ *   _context: CommitContext
  * }} CommitElement
  */
 
@@ -153,7 +194,7 @@ function createCommitElement() {
   const commitElement = /** @type {CommitElement} */ (clonedFragment.firstElementChild);
   commitsContainer.appendChild(commitElement);
   commitElement._elems = {
-    edges: [...commitElement.querySelectorAll('.edge')],
+    edges: /** @type {SVGElement[]} */([...commitElement.querySelectorAll('.edge')]),
     message: commitElement.querySelector('.message'),
     refsContainer: commitElement.querySelector('.refs'),
   };
@@ -161,22 +202,27 @@ function createCommitElement() {
 }
 
 
+/**
+ * @param {CommitElement} commitElement
+ * @param {CommitContext} context
+ * @param {CommitContext} [oldContext]
+ */
 function updateCommitElement(commitElement, context, oldContext) {
-  // Remove `display: none;`
+  // Remove `display: none;` because new and reused commit elements are initially hidden.
   commitElement.style.removeProperty('display');
   commitElement._context = context;
   commitElement.style.setProperty('--transition-duration', context.transitionDuration ?? '0s');
-  commitElement.style.setProperty('--row', context.row);
-  commitElement.style.setProperty('--column', context.column);
+  commitElement.style.setProperty('--row', context.row.toString());
+  commitElement.style.setProperty('--column', context.column.toString());
   commitElement.style.setProperty('--color', context.color);
-  commitElement.style.setProperty('--max-column', context.maxColumn);
+  commitElement.style.setProperty('--max-column', context.maxColumn.toString());
   commitElement.setAttribute('data-commit-id', context.commitId);
   for (const [index, edgeElement] of commitElement._elems.edges.entries()) {
     const edge = context.edges[index];
     if (edge) {
       edgeElement.style.removeProperty('display');
       edgeElement.setAttribute('d', edge.pathString);
-      edgeElement.setAttribute('stroke-dasharray', edge.totalLength);
+      edgeElement.setAttribute('stroke-dasharray', edge.totalLength.toString());
       edgeElement.style.stroke = edge.strokeColor;
     }
     else {
@@ -263,6 +309,7 @@ function renderVisibleCommits() {
 }
 
 
+/** @param {{ commits: Commit[], refs: Object.<string, Reference> }} args */
 async function renderCommits({ commits, refs }) {
   /** @type {HTMLElement} */
   const commitsContainer = document.querySelector('.commits');
@@ -284,19 +331,20 @@ async function renderCommits({ commits, refs }) {
   commitsContainer.style.setProperty('--max-row', maxRow.toString());
 
   // Reverse mapping for refs
-  const refsForCommitId = {};
+  /** @type {Object.<string, Reference[]>} */
+  const refsByCommitId = {};
   for (const ref of Object.values(refs)) {
-    if (refsForCommitId[ref.commitId] === undefined) {
-      refsForCommitId[ref.commitId] = [];
+    if (refsByCommitId[ref.commitId] === undefined) {
+      refsByCommitId[ref.commitId] = [];
     }
-    refsForCommitId[ref.commitId].push(ref);
+    refsByCommitId[ref.commitId].push(ref);
   }
 
   // Collect paths of nodes
-  const paths = [];
-  const pathForCommitId = new Map();
-  const nodeForCommitId = new Map();
-  const childIdsForCommitId = new Map();
+  /** @type {Path[]} */ const paths = [];
+  /** @type {Map<string, Path>} */ const pathForCommitId = new Map();
+  /** @type {Map<string, Node>} */ const nodeForCommitId = new Map();
+  /** @type {Map<string, string[]>} */ const childIdsForCommitId = new Map();
   for (const [index, commit] of commits.entries()) {
     // Non-blocking iteration
     const batchSize = 1000;
@@ -512,16 +560,18 @@ async function renderCommits({ commits, refs }) {
           strokeColor = colors[parentNode.path.columnIndex % colors.length];
         }
         const pathString = pathCommands.join(' ');
-        edges.push({
+        /** @type {EdgeContext} */
+        const edgeContext = {
           pathString,
           totalLength: calculatePathStringLength(pathString),
           strokeColor,
-        });
+        };
+        edges.push(edgeContext);
       }
       return edges;
     }
     // Refs
-    const commitRefs = refsForCommitId[commit.id] ?? [];
+    const commitRefs = refsByCommitId[commit.id] ?? [];
     commitRefs.sort((a, b) => {
       let refTypeA = a.refType;
       let refTypeB = b.refType;
@@ -552,6 +602,7 @@ async function renderCommits({ commits, refs }) {
     });
     for (const ref of commitRefs) {
       const oldRefContext = refContextByRefPath[ref.fullRefPath];
+      /** @type {ReferenceContext} */
       const newRefContext = {
         ref,
         htmlString: renderRef(ref),
@@ -564,6 +615,7 @@ async function renderCommits({ commits, refs }) {
     const node = nodeForCommitId.get(commit.id);
     const color = colors[node.path.columnIndex % colors.length];
     const edges = getEdges();
+    /** @type {CommitContext} */
     const newCommitContext = {
       row: node.row,
       column: node.path.columnIndex,
@@ -653,15 +705,15 @@ function main() {
 
   async function getCommitsAndRender() {
     const maxCommits = settings.get('maxCommits');
-    const branchVisibility = settings.get('branchVisibility');
+    const commitVisibility = settings.get('commitVisibility');
     const flags = [
       '--date-order',
       `--max-count=${maxCommits}`,
     ];
-    if (branchVisibility === 'allRefs') {
+    if (commitVisibility === 'allRefs') {
       flags.push('--all');
     }
-    if (branchVisibility === 'allRefsHistory') {
+    if (commitVisibility === 'allRefsHistory') {
       flags.push('--all', '--reflog');
     }
     // const commits = await git.logCustom(...flags);

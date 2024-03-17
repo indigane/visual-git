@@ -52,6 +52,7 @@ export const customLogFormatString = (() => {
 
 
 export function parseLogCustomFormat(commandOutput) {
+  /** @type {Commit[]} */
   const commits = [];
   const commitChunks = commandOutput.split('\n\n\n');
   for (const commit of commitChunks) {
@@ -108,7 +109,9 @@ export function parseLogCustomFormat(commandOutput) {
 const LOG_RAW_PERSON_REGEX = /^(?<name>.+) <(?<email>.*)> (?<timestamp>.+) (?<time_offset>.+)$/;
 
 export function parseLogRaw(commandOutput) {
+  /** @type {Commit[]} */
   const commits = [];
+  /** @type {Object.<string, Reference>} A mapping of refs with `fullRefPath` as the keys */
   const refs = {};
   // Git log in raw format is headers and message separated by two newlines.
   // Each commit is also separated by two newlines.

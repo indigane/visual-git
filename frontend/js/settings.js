@@ -1,20 +1,29 @@
 
 import { elementEvent } from './utils.js';
 
+/**
+ * @typedef {Object} Settings
+ * @property {'currentBranch' | 'allRefs' | 'allRefsHistory'} commitVisibility
+ * @property {number} maxCommits
+ */
+
+/** @type {Settings} */
 const DEFAULT_SETTINGS = {
-  'branchVisibility': 'allRefs',
+  'commitVisibility': 'allRefs',
   'maxCommits': 1000,
 };
 
 const validation = {
-  'branchVisibility': ['currentBranch', 'allRefs', 'allRefsHistory'],
+  'commitVisibility': ['currentBranch', 'allRefs', 'allRefsHistory'],
   'maxCommits': Number.isInteger,
 };
 
 export class SettingsContainerElement extends HTMLElement {
   constructor() {
     super();
+    /** @type {Partial<Settings>} */
     this.userSettings = {};
+    /** @type {Partial<Settings>} */
     this.repositorySettings = {};
   }
   connectedCallback() {
@@ -28,12 +37,18 @@ export class SettingsContainerElement extends HTMLElement {
       elementEvent(this, 'setting-change', { name, oldValue, newValue });
     });
   }
+  /**
+   * Get the current setting value by name.
+   * @template {keyof Settings} K
+   * @param {K} name The setting name to get.
+   * @returns {Settings[K]} The setting value.
+   */
   get(name) {
     if (this.repositorySettings[name] !== undefined) {
-      return this.repositorySettings[name];
+      return /** @type {Settings[K]} */ (this.repositorySettings[name]);
     }
     if (this.userSettings[name] !== undefined) {
-      return this.userSettings[name];
+      return /** @type {Settings[K]} */ (this.userSettings[name]);
     }
     return DEFAULT_SETTINGS[name];
   }
