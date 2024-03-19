@@ -29,12 +29,12 @@ export class SettingsElement extends HTMLElement {
   connectedCallback() {
     const settings = this;
     this.addEventListener('change', function handleChange(event) {
-      const inputElement = /** @type {HTMLInputElement} */ (this);
+      const inputElement = /** @type {HTMLInputElement} */ (event.target);
       const name = inputElement.getAttribute('name');
       const oldValue = settings.userSettings[name];
       const newValue = inputElement.value;
       settings.userSettings[name] = newValue;
-      elementEvent(this, 'setting-change', { name, oldValue, newValue });
+      elementEvent(settings, 'setting-change', { name, oldValue, newValue });
     });
   }
   /**
