@@ -39,3 +39,19 @@ Some ideas Visual Git may or may not be built on:
 
 - Run `vg` in a git repository.
 - Alternatively run `vg <path-to-repository>`.
+
+
+## Using with docker
+
+Build container with following command
+
+```
+docker build -t visualgit .
+```
+
+Start docker with following command in repository directory
+
+```
+docker run --rm -i -t -v .:/home/vision/repo -p 3000:3000 visualgit
+```
+
