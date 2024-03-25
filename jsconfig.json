@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "es2018",
+    "lib": ["es2018", "dom", "dom.iterable"],
+    "checkJs": true,
+    "noEmit": true
+  },
+  "include": [
+    "./frontend/**/*.js"
+  ],
+  "exclude": [
+    "**/vendor/*.js"
+  ]
+}

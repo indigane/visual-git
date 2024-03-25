@@ -11,23 +11,23 @@
       <div>
         Field of vision:
         <label>
-          <input type="radio" autocomplete="off" name="branchVisibility" value="currentBranch">
+          <input type="radio" autocomplete="off" name="commitVisibility" value="currentBranch">
           Current branch only
         </label>
         <label>
-          <input type="radio" autocomplete="off" name="branchVisibility" value="allRefs" checked>
+          <input type="radio" autocomplete="off" name="commitVisibility" value="allRefs" checked>
           Other branches too
         </label>
         <label>
-          <input type="radio" autocomplete="off" name="branchVisibility" value="allRefsHistory">
+          <input type="radio" autocomplete="off" name="commitVisibility" value="allRefsHistory">
           Deleted commits too
         </label>
       </div>
     </vg-settings>
-    <div class="graph-container">
+    <vg-graph class="graph-container">
       <div class="commits"></div>
       <div class="refs"></div>
-    </div>
+    </vg-graph>
     <template id="commit-template">
       <div class="commit" style="--transition-duration: 0s; display: none;">
         <div class="graph">
@@ -41,7 +41,7 @@
         <div class="refs"></div>
       </div>
     </template>
-    <script src="js/reconnecting-websocket.min.js"></script>
+    <script src="js/vendor/reconnecting-websocket.js"></script>
     <script src="js/main.js" type="module"></script>
   </body>
 </html>

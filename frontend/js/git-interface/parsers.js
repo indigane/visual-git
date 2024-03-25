@@ -1,5 +1,6 @@
-import { Commit, Reference } from './commit.js';
-import { splitOnce } from './utils.js';
+import Commit from '../models/commit.js';
+import Reference from '../models/reference.js';
+import { splitOnce } from '../utils.js';
 
 
 export const customLogFormatString = (() => {
@@ -52,6 +53,7 @@ export const customLogFormatString = (() => {
 
 
 export function parseLogCustomFormat(commandOutput) {
+  /** @type {Commit[]} */
   const commits = [];
   const commitChunks = commandOutput.split('\n\n\n');
   for (const commit of commitChunks) {
@@ -108,7 +110,9 @@ export function parseLogCustomFormat(commandOutput) {
 const LOG_RAW_PERSON_REGEX = /^(?<name>.+) <(?<email>.*)> (?<timestamp>.+) (?<time_offset>.+)$/;
 
 export function parseLogRaw(commandOutput) {
+  /** @type {Commit[]} */
   const commits = [];
+  /** @type {Object.<string, Reference>} A mapping of refs with `fullRefPath` as the keys */
   const refs = {};
   // Git log in raw format is headers and message separated by two newlines.
   // Each commit is also separated by two newlines.
@@ -178,13 +182,13 @@ function parseLogRawHeaders(headerChunk) {
       const { name, email, timestamp, _timeOffset } = LOG_RAW_PERSON_REGEX.exec(headerValue).groups;
       headers.authorName = name;
       headers.authorEmail = email;
-      headers.authorDate = new Date(timestamp * 1000);
+      headers.authorDate = new Date(parseInt(timestamp) * 1000);
     }
     else if (headerName === 'committer') {
       const { name, email, timestamp, _timeOffset } = LOG_RAW_PERSON_REGEX.exec(headerValue).groups;
       headers.committerName = name;
       headers.committerEmail = email;
-      headers.committerDate = new Date(timestamp * 1000);
+      headers.committerDate = new Date(parseInt(timestamp) * 1000);
     }
   }
   return headers;
