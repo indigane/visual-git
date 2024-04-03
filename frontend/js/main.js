@@ -21,6 +21,7 @@ function main() {
       `--max-count=${maxCommits}`,
     ];
     if (commitVisibility === 'allRefs') {
+      // NOTE: --exclude=*dependabot*
       flags.push('--all');
     }
     if (commitVisibility === 'allRefsHistory') {

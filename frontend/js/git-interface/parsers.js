@@ -250,3 +250,32 @@ export function parseFullRefPath(fullRefPath) {
     };
   }
 }
+
+const SUBJECT_BRANCH_NAME_REGEX = /^Merge(?<isRemoteTracking> remote-tracking)? (?:branch (?<quote1>['"]?)(?<sourceBranch>\S+)\k<quote1>|branches .+(?<quote2>['"]?) and \k<quote2>\S+\k<quote2>|pull request .+ from (?<mergeRequestSource>\S+))(?: of \S+)?(?: into (?<quote3>['"]?)(?<targetBranch>\S+)\k<quote3>)?$/i;
+
+/**
+ * @param {string} subject Commit subject line to be parsed.
+ * @return {{
+ *   mergeSourceBranchName?: string
+ *   mergeTargetBranchName?: string
+ * }}
+ */
+export function parseBranchNamesFromSubject(subject) {
+  const {
+    sourceBranch,
+    targetBranch,
+    mergeRequestSource,
+    isRemoteTracking,
+  } = SUBJECT_BRANCH_NAME_REGEX.exec(subject)?.groups ?? {};
+  const result = {
+    mergeSourceBranchName: undefined,
+    mergeTargetBranchName: undefined,
+  };
+  if (sourceBranch && ! isRemoteTracking) {
+    result.mergeSourceBranchName = sourceBranch;
+  }
+  if (targetBranch) {
+    result.mergeTargetBranchName = targetBranch;
+  }
+  return result;
+}

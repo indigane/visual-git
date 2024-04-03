@@ -7,8 +7,8 @@ export default class Commit {
   /** @type {string} The name of the committer. */ committerName;
   /** @type {string} The email of the committer. */ committerEmail;
   /** @type {Date} The date when the committer committed the commit. */ committerDate;
-  /** @type {string} The commit subject. */ subject;
-  /** @type {string} The body of the commit message. */ messageBody;
+  /** @type {string} The commit subject. Separated from the commit body by two newlines. */ subject;
+  /** @type {string} The body of the commit message. Separated from the subject by two newlines. */ messageBody;
   /** @type {string} Notes attached to the commit. */ notes;
   /**
    * @param {object} props Commit properties.
@@ -20,8 +20,8 @@ export default class Commit {
    * @param {string} [props.committerName] The name of the committer.
    * @param {string} [props.committerEmail] The email of the committer.
    * @param {Date} [props.committerDate] The date when the committer committed the commit.
-   * @param {string} [props.subject] The commit subject.
-   * @param {string} [props.messageBody] The body of the commit message.
+   * @param {string} [props.subject] The commit subject. Separated from the commit body by two newlines.
+   * @param {string} [props.messageBody] The body of the commit message. Separated from the subject by two newlines.
    * @param {string} [props.notes] Notes attached to the commit.
    */
   constructor({ ...props }) {
