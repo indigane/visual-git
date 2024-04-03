@@ -26,8 +26,8 @@ class Path {
   getEndIndex() {
     return this.nodes.slice(-1)[0].row;
   }
+  /** Get the start index of the path, including the connecting node of the parent path(s) if any */
   getExtendedStartIndex() {
-    // Includes space for edges connecting this path to other paths
     const firstNode = this.nodes[0];
     let startIndex = firstNode.row;
     for (const childNode of firstNode.children) {
@@ -37,8 +37,8 @@ class Path {
     }
     return startIndex;
   }
+  /** Get the end index of the path, including the connecting node of the parent path(s) if any */
   getExtendedEndIndex() {
-    // Includes space for edges connecting this path to other paths
     const lastNode = this.nodes.slice(-1)[0];
     let endIndex = lastNode.row;
     for (const parentNode of lastNode.parents) {
@@ -47,6 +47,18 @@ class Path {
       }
     }
     return endIndex;
+  }
+  /** Return true if the path start or end is not connected to any other path */
+  getIsOpenPath() {
+    const firstNode = this.nodes[0];
+    if (firstNode.children.length === 0) {
+      return true;
+    }
+    const lastNode = this.nodes.slice(-1)[0];
+    if (lastNode.parents.length === 0) {
+      return true;
+    }
+    return false;
   }
   getPrimaryParentPath() {
     const lastNode = this.nodes.slice(-1)[0];
@@ -424,9 +436,20 @@ export class GraphElement extends HTMLElement {
       const pathBLength = pathB.getExtendedEndIndex() - pathB.getExtendedStartIndex();
       const pathAPriority = pathA.mergeCount === 0 ? pathA.getPrimaryParentPath()?.mergeCount ?? pathA.mergeCount : pathA.mergeCount;
       const pathBPriority = pathB.mergeCount === 0 ? pathB.getPrimaryParentPath()?.mergeCount ?? pathB.mergeCount : pathB.mergeCount;
-      //return pathBLength - pathALength;
+      // Prioritize paths that have parents with high merge count
       if (pathBPriority - pathAPriority === 0) {
+        // Otherwise try sorting by merge count
         if (pathB.mergeCount - pathA.mergeCount === 0) {
+          // Otherwise sort by extended path length,
+          // considering open paths always longer than closed paths.
+          const pathAIsOpen = pathA.getIsOpenPath();
+          const pathBIsOpen = pathB.getIsOpenPath();
+          if (pathAIsOpen && ! pathBIsOpen) {
+            return 1;
+          }
+          if ( ! pathAIsOpen && pathBIsOpen) {
+            return -1;
+          }
           return pathALength - pathBLength;
         }
         return pathB.mergeCount - pathA.mergeCount;
