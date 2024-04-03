@@ -64,6 +64,12 @@ class Path {
     const lastNode = this.nodes.slice(-1)[0];
     return lastNode.parents[0]?.path;
   }
+  getPathPriority() {
+    if (this.mergeCount === 0) {
+      return this.getPrimaryParentPath()?.mergeCount ?? this.mergeCount;
+    }
+    return this.mergeCount;
+  }
   /** @param {Path} pathB Compare pathA to pathB for path priority */
   compare(pathB) {
     // In the future this should also check branch order (main, develop, features, etc)
@@ -434,8 +440,8 @@ export class GraphElement extends HTMLElement {
     paths.sort((pathA, pathB) => {
       const pathALength = pathA.getExtendedEndIndex() - pathA.getExtendedStartIndex();
       const pathBLength = pathB.getExtendedEndIndex() - pathB.getExtendedStartIndex();
-      const pathAPriority = pathA.mergeCount === 0 ? pathA.getPrimaryParentPath()?.mergeCount ?? pathA.mergeCount : pathA.mergeCount;
-      const pathBPriority = pathB.mergeCount === 0 ? pathB.getPrimaryParentPath()?.mergeCount ?? pathB.mergeCount : pathB.mergeCount;
+      const pathAPriority = pathA.getPathPriority();
+      const pathBPriority = pathB.getPathPriority();
       // Prioritize paths that have parents with high merge count
       if (pathBPriority - pathAPriority === 0) {
         // Otherwise try sorting by merge count
