@@ -7,6 +7,7 @@ import {
 } from './animations.js';
 import Commit from '../models/commit.js';
 import Reference from '../models/reference.js';
+import { parseBranchNamesFromSubject } from '../git-interface/parsers.js';
 import { asTextContent, requestIdlePromise } from '../utils.js';
 
 
@@ -16,6 +17,9 @@ class Path {
     this.nodes = nodes;
     this.columnIndex = undefined;
     this.mergeCount = 0;
+    this.priorityForNodes = 0;
+    this.nameCandidatesFromRefs = [];
+    this.nameCandidatesFromCommitSubjectLines = [];
   }
   getId() {
     return this.nodes[0].commit.id;
@@ -26,8 +30,8 @@ class Path {
   getEndIndex() {
     return this.nodes.slice(-1)[0].row;
   }
+  /** Get the start index of the path, including the connecting node of the parent path(s) if any */
   getExtendedStartIndex() {
-    // Includes space for edges connecting this path to other paths
     const firstNode = this.nodes[0];
     let startIndex = firstNode.row;
     for (const childNode of firstNode.children) {
@@ -37,26 +41,106 @@ class Path {
     }
     return startIndex;
   }
+  /** Get the end index of the path, including the connecting node of the parent path(s) if any */
   getExtendedEndIndex() {
-    // Includes space for edges connecting this path to other paths
     const lastNode = this.nodes.slice(-1)[0];
     let endIndex = lastNode.row;
-    for (const parentNode of lastNode.parents) {
-      if (parentNode !== undefined && parentNode.row > endIndex) {
-        endIndex = parentNode.row;
-      }
+    const primaryParentNode = lastNode.parents[0];
+    if (primaryParentNode !== undefined && primaryParentNode.row > endIndex) {
+      endIndex = primaryParentNode.row;
     }
     return endIndex;
+  }
+  /** Return true if the path start or end is not connected to any other path */
+  getIsOpenPath() {
+    const firstNode = this.nodes[0];
+    if (firstNode.children.length === 0) {
+      return true;
+    }
+    const lastNode = this.nodes.slice(-1)[0];
+    if (lastNode.parents.length === 0) {
+      return true;
+    }
+    return false;
   }
   getPrimaryParentPath() {
     const lastNode = this.nodes.slice(-1)[0];
     return lastNode.parents[0]?.path;
   }
-  /** @param {Path} pathB Compare pathA to pathB for path priority */
-  compare(pathB) {
-    // In the future this should also check branch order (main, develop, features, etc)
+  _getInferredName() {
+    const namePriorities = [
+      /^(.+\/)?(master|main|trunk|default)$/i,
+      /^(.+\/)?(hotfix\/.+)$/i,
+      /^(.+\/)?(develop|development)$/i,
+    ];
+    for (const namePriorityRegex of namePriorities) {
+      for (const nameCandidate of this.nameCandidatesFromRefs) {
+        if (namePriorityRegex.test(nameCandidate)) {
+          return nameCandidate;
+        }
+      }
+      for (const nameCandidate of this.nameCandidatesFromCommitSubjectLines) {
+        if (namePriorityRegex.test(nameCandidate)) {
+          return nameCandidate;
+        }
+      }
+    }
+    if (this.nameCandidatesFromRefs.length > 0) {
+      return this.nameCandidatesFromRefs[0];
+    }
+    if (this.nameCandidatesFromCommitSubjectLines.length > 0) {
+      return this.nameCandidatesFromCommitSubjectLines[0];
+    }
+    return undefined;
+  }
+  getInferredName() {
+    if (this._inferredName !== undefined) {
+      return this._inferredName;
+    }
+    this._inferredName = this._getInferredName();
+    return this._inferredName;
+  }
+  _getPathNamePriority(pathName) {
+    const namePriorities = [
+      /^(.+\/)?(master|main|trunk|default)$/i,
+      /^(.+\/)?(hotfix\/.+)$/i,
+      /^(.+\/)?(develop|development)$/i,
+    ];
+    if (pathName === undefined) {
+      pathName = this.getInferredName();
+    }
+    let priorityIndex;
+    for (priorityIndex = 0; priorityIndex < namePriorities.length; priorityIndex++) {
+      const namePriorityRegex = namePriorities[priorityIndex];
+      if (namePriorityRegex?.test(pathName)) {
+        break;
+      }
+    }
+    const priority = namePriorities.length - priorityIndex;
+    if (priority === 0) {
+      return this.getPrimaryParentPath()?.getPathNamePriority() ?? priority;
+    }
+    return priority;
+  }
+  getPathNamePriority() {
+    if (this._namePriority !== undefined) {
+      return this._namePriority;
+    }
+    this._namePriority = this._getPathNamePriority();
+    return this._namePriority;
+  }
+  getMergeCountPriority() {
+    if (this.mergeCount === 0) {
+      return this.getPrimaryParentPath()?.mergeCount ?? this.mergeCount;
+    }
+    return this.mergeCount;
+  }
+  compareForNodeInsertion(pathB) {
     const pathA = this;
-    return pathB.getStartIndex() - pathA.getStartIndex();
+    if (pathA.priorityForNodes === pathB.priorityForNodes) {
+      return pathB.getStartIndex() - pathA.getStartIndex();
+    }
+    return pathA.priorityForNodes - pathB.priorityForNodes;
   }
 }
 
@@ -337,11 +421,21 @@ export class GraphElement extends HTMLElement {
     // Reverse mapping for refs
     /** @type {Object.<string, Reference[]>} */
     const refsByCommitId = {};
+    const priorityPathIds = [];
+    const namePriorities = [
+      /^(.+\/)?(master|main|trunk|default)$/i,
+      /^(.+\/)?(develop|development)$/i,
+    ];
     for (const ref of Object.values(refs)) {
       if (refsByCommitId[ref.commitId] === undefined) {
         refsByCommitId[ref.commitId] = [];
       }
       refsByCommitId[ref.commitId].push(ref);
+      for (const namePriorityRegex of namePriorities) {
+        if (namePriorityRegex?.test(ref.refName)) {
+          priorityPathIds.push(ref.commitId);
+        }
+      }
     }
 
     // Collect paths of nodes
@@ -349,6 +443,21 @@ export class GraphElement extends HTMLElement {
     /** @type {Map<string, Path>} */ const pathForCommitId = new Map();
     /** @type {Map<string, Node>} */ const nodeForCommitId = new Map();
     /** @type {Map<string, string[]>} */ const childIdsForCommitId = new Map();
+    function createPath(commitId) {
+      const path = new Path({
+        nodes: [],
+      });
+      paths.push(path);
+      pathForCommitId.set(commitId, path);
+      return path;
+    }
+    function getOrCreatePathForCommitId(commitId) {
+      const path = pathForCommitId.get(commitId);
+      if (path !== undefined) {
+        return path;
+      }
+      return createPath(commitId);
+    }
     for (const [index, commit] of commits.entries()) {
       // Non-blocking iteration
       const batchSize = 1000;
@@ -357,16 +466,15 @@ export class GraphElement extends HTMLElement {
       if (isBatchSizeReached) {
         await requestIdlePromise(maxWaitMs);
       }
-      // Create new path if necessary
-      if ( ! pathForCommitId.has(commit.id)) {
-        const newPath = new Path({
-          nodes: [],
-        });
-        paths.push(newPath);
-        pathForCommitId.set(commit.id, newPath);
-      }
       // Place node on a path
-      const path = pathForCommitId.get(commit.id);
+      let path;
+      const shouldCreateNewPath = priorityPathIds.includes(commit.id);
+      if (shouldCreateNewPath) {
+        path = createPath(commit.id);
+        path.priorityForNodes = 1;
+      } else {
+        path = getOrCreatePathForCommitId(commit.id);
+      }
       const node = new Node({
         commit,
         path,
@@ -380,11 +488,11 @@ export class GraphElement extends HTMLElement {
       if (primaryParentId === undefined) {
         // No parents, do nothing.
       }
-      else if (existingPath !== undefined && path.compare(existingPath) < 0) {
-        // Existing path has precedence, do nothing.
+      else if (existingPath !== undefined && path.compareForNodeInsertion(existingPath) < 0) {
+        // Existing path for parent node has precedence, do nothing.
       }
       else {
-        // No existing path, or new path has precedence.
+        // No existing path for parent node, or our path has precedence.
         pathForCommitId.set(primaryParentId, path);
       }
       // Keep track of child ids for node relationships
@@ -408,6 +516,23 @@ export class GraphElement extends HTMLElement {
           }
         }
       }
+      // Add path name candidates from refs
+      const refs = refsByCommitId[commit.id] ?? [];
+      for (const ref of refs) {
+        path.nameCandidatesFromRefs.push(ref.refName);
+      }
+      // Add path name candidates from commit subject lines
+      const { mergeSourceBranchName, mergeTargetBranchName } = parseBranchNamesFromSubject(commit.subject);
+      if (mergeTargetBranchName !== undefined) {
+        // Current commit is a merge commit. Use the merge target branch name as a candidate.
+        path.nameCandidatesFromCommitSubjectLines.push(mergeTargetBranchName);
+      }
+      if (mergeSourceBranchName !== undefined) {
+        // Current commit is a merge commit. Use the merge source branch name as a candidate for the secondary parent's path.
+        const secondaryParentCommitId = commit.parents[1];
+        const secondaryParentPath = getOrCreatePathForCommitId(secondaryParentCommitId);
+        secondaryParentPath.nameCandidatesFromCommitSubjectLines.push(mergeSourceBranchName);
+      }
     }
 
     // Sort paths
@@ -422,16 +547,32 @@ export class GraphElement extends HTMLElement {
     paths.sort((pathA, pathB) => {
       const pathALength = pathA.getExtendedEndIndex() - pathA.getExtendedStartIndex();
       const pathBLength = pathB.getExtendedEndIndex() - pathB.getExtendedStartIndex();
-      const pathAPriority = pathA.mergeCount === 0 ? pathA.getPrimaryParentPath()?.mergeCount ?? pathA.mergeCount : pathA.mergeCount;
-      const pathBPriority = pathB.mergeCount === 0 ? pathB.getPrimaryParentPath()?.mergeCount ?? pathB.mergeCount : pathB.mergeCount;
-      //return pathBLength - pathALength;
-      if (pathBPriority - pathAPriority === 0) {
-        if (pathB.mergeCount - pathA.mergeCount === 0) {
-          return pathALength - pathBLength;
-        }
+      const pathANamePriority = pathA.getPathNamePriority();
+      const pathBNamePriority = pathB.getPathNamePriority();
+      const pathAMergeCountPriority = pathA.getMergeCountPriority();
+      const pathBMergeCountPriority = pathB.getMergeCountPriority();
+      // Prioritize paths with known name priority
+      if (pathBNamePriority - pathANamePriority !== 0) {
+        return pathBNamePriority - pathANamePriority;
+      }
+      // Prioritize paths that have parents with high merge count
+      if (pathBMergeCountPriority - pathAMergeCountPriority !== 0) {
+        return pathBMergeCountPriority - pathAMergeCountPriority;
+      }
+      // Prioritize high merge count
+      if (pathB.mergeCount - pathA.mergeCount !== 0) {
         return pathB.mergeCount - pathA.mergeCount;
       }
-      return pathBPriority - pathAPriority;
+      // Prioritize shorter paths, considering open paths to always be longer than closed paths.
+      const pathAIsOpen = pathA.getIsOpenPath();
+      const pathBIsOpen = pathB.getIsOpenPath();
+      if (pathAIsOpen && ! pathBIsOpen) {
+        return 1;
+      }
+      if ( ! pathAIsOpen && pathBIsOpen) {
+        return -1;
+      }
+      return pathALength - pathBLength;
     });
 
     // Select columns for paths

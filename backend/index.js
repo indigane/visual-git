@@ -221,6 +221,7 @@ function validateArguments(commandArguments) {
       ],
       allowedArgumentsRegex: makeArgumentsRegex(
         /--max-count=\d+/,
+        /--exclude=\S+/,
       ),
     },
   };
