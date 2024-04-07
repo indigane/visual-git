@@ -431,9 +431,12 @@ export class GraphElement extends HTMLElement {
         refsByCommitId[ref.commitId] = [];
       }
       refsByCommitId[ref.commitId].push(ref);
-      for (const namePriorityRegex of namePriorities) {
+      for (const [index, namePriorityRegex] of namePriorities.entries()) {
         if (namePriorityRegex?.test(ref.refName)) {
           priorityPathIds.push(ref.commitId);
+          // These are used to split paths. To avoid splitting for example
+          // main multiple times, remove it after the first occurrence.
+          namePriorities.splice(index, 1);
         }
       }
     }
@@ -545,17 +548,15 @@ export class GraphElement extends HTMLElement {
       }
     }
     paths.sort((pathA, pathB) => {
-      const pathALength = pathA.getExtendedEndIndex() - pathA.getExtendedStartIndex();
-      const pathBLength = pathB.getExtendedEndIndex() - pathB.getExtendedStartIndex();
+      // Prioritize paths with known name priority
       const pathANamePriority = pathA.getPathNamePriority();
       const pathBNamePriority = pathB.getPathNamePriority();
-      const pathAMergeCountPriority = pathA.getMergeCountPriority();
-      const pathBMergeCountPriority = pathB.getMergeCountPriority();
-      // Prioritize paths with known name priority
       if (pathBNamePriority - pathANamePriority !== 0) {
         return pathBNamePriority - pathANamePriority;
       }
       // Prioritize paths that have parents with high merge count
+      const pathAMergeCountPriority = pathA.getMergeCountPriority();
+      const pathBMergeCountPriority = pathB.getMergeCountPriority();
       if (pathBMergeCountPriority - pathAMergeCountPriority !== 0) {
         return pathBMergeCountPriority - pathAMergeCountPriority;
       }
@@ -572,6 +573,8 @@ export class GraphElement extends HTMLElement {
       if ( ! pathAIsOpen && pathBIsOpen) {
         return -1;
       }
+      const pathALength = pathA.getExtendedEndIndex() - pathA.getExtendedStartIndex();
+      const pathBLength = pathB.getExtendedEndIndex() - pathB.getExtendedStartIndex();
       return pathALength - pathBLength;
     });
 
