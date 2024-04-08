@@ -639,7 +639,7 @@ export class GraphElement extends HTMLElement {
           refTypeClass = `ref-${ref.refType}`;
         }
         if (ref.refName === 'HEAD') {
-          refName = `<strong style="color: green;">YOU ARE HERE ${rightArrow}</strong>`;
+          refName = `YOU ARE HERE ${rightArrow}`;
           refTitle = '';
         } else if (ref.refType === 'stash') {
           refName = '<em>Your latest stash</em>';
