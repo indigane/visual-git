@@ -491,7 +491,7 @@ export class GraphElement extends HTMLElement {
       if (primaryParentId === undefined) {
         // No parents, do nothing.
       }
-      else if (existingPath !== undefined && path.compareForNodeInsertion(existingPath) < 0) {
+      else if (existingPath !== undefined && existingPath.nodes.length > 0 && path.compareForNodeInsertion(existingPath) < 0) {
         // Existing path for parent node has precedence, do nothing.
       }
       else {
@@ -539,12 +539,16 @@ export class GraphElement extends HTMLElement {
     }
 
     // Sort paths
-    for (const path of paths) {
+    for (const [index, path] of paths.entries()) {
       path.mergeCount = 0;
       for (const node of path.nodes) {
         if (node.parents.length > 1) {
           path.mergeCount += 1;
         }
+      }
+      if (path.nodes.length === 0) {
+        // Remove paths with no nodes
+        paths.splice(index, 1);
       }
     }
     paths.sort((pathA, pathB) => {
