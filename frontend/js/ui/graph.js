@@ -649,6 +649,7 @@ export class GraphElement extends HTMLElement {
         } else if (ref.refType === 'stash') {
           refName = 'Your latest stash';
           refTitle = '';
+          iconPart = '<svg-icon src="img/icon-box-package.svg" title="Your latest stash"></svg-icon>';
         } else if (ref.refType === 'remotes') {
           let remoteName;
           // TODO: Remotes can have slashes, although you should probably be slapped if you do that.
