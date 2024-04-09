@@ -108,7 +108,7 @@ svg-icon svg {
 .commit .ref-remotes .ref-part-remote {
 }
 .commit .ref-stash {
-  font-style: italic;
+  color: brown;
 }
 .commit .ref-HEAD {
   color: red;
