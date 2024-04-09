@@ -431,7 +431,7 @@ export class GraphElement extends HTMLElement {
         refsByCommitId[ref.commitId] = [];
       }
       refsByCommitId[ref.commitId].push(ref);
-      for (const [index, namePriorityRegex] of namePriorities.entries()) {
+      for (const [index, namePriorityRegex] of [...namePriorities.entries()]) {
         if (namePriorityRegex?.test(ref.refName)) {
           priorityPathIds.push(ref.commitId);
           // These are used to split paths. To avoid splitting for example
@@ -442,7 +442,7 @@ export class GraphElement extends HTMLElement {
     }
 
     // Collect paths of nodes
-    /** @type {Path[]} */ const paths = [];
+    /** @type {Path[]} */ let paths = [];
     /** @type {Map<string, Path>} */ const pathForCommitId = new Map();
     /** @type {Map<string, Node>} */ const nodeForCommitId = new Map();
     /** @type {Map<string, string[]>} */ const childIdsForCommitId = new Map();
@@ -538,17 +538,16 @@ export class GraphElement extends HTMLElement {
       }
     }
 
+    // Remove empty paths
+    paths = paths.filter(path => path.nodes.length > 0);
+
     // Sort paths
-    for (const [index, path] of paths.entries()) {
+    for (const path of paths) {
       path.mergeCount = 0;
       for (const node of path.nodes) {
         if (node.parents.length > 1) {
           path.mergeCount += 1;
         }
-      }
-      if (path.nodes.length === 0) {
-        // Remove paths with no nodes
-        paths.splice(index, 1);
       }
     }
     paths.sort((pathA, pathB) => {
