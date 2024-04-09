@@ -8,7 +8,7 @@ import {
 import Commit from '../models/commit.js';
 import Reference from '../models/reference.js';
 import { parseBranchNamesFromSubject } from '../git-interface/parsers.js';
-import { asTextContent, requestIdlePromise } from '../utils.js';
+import { asTextContent, requestIdlePromise, splitOnce } from '../utils.js';
 
 
 class Path {
@@ -636,6 +636,8 @@ export class GraphElement extends HTMLElement {
         let refName = asTextContent(ref.refName);
         let refTitle = refName;
         let refTypeClass;
+        let remotePart = '';
+        let iconPart = '';
         if (ref.refType === null) {
           refTypeClass = 'special-ref';
         } else {
@@ -645,10 +647,23 @@ export class GraphElement extends HTMLElement {
           refName = `YOU ARE HERE ${rightArrow}`;
           refTitle = '';
         } else if (ref.refType === 'stash') {
-          refName = '<em>Your latest stash</em>';
+          refName = 'Your latest stash';
           refTitle = '';
+        } else if (ref.refType === 'remotes') {
+          let remoteName;
+          // TODO: Remotes can have slashes, although you should probably be slapped if you do that.
+          [remoteName, refName] = splitOnce(ref.refName, '/');
+          refName = asTextContent(refName);
+          remotePart = `<span class="ref-part-remote">(${asTextContent(remoteName)})</span>`;
+          iconPart = `<svg-icon src="img/icon-share.svg" title="Remote branch"></svg-icon>`;
         }
-        return `<div class="ref ${asTextContent(refTypeClass)}" title="${refTitle}">${refName}</div>`;
+        else if (ref.refType === 'tags') {
+          iconPart = '<svg-icon src="img/icon-tag.svg" title="Tag"></svg-icon>';
+        }
+        else if (ref.refType === 'heads') {
+          iconPart = '<svg-icon src="img/icon-branching.svg" title="Local branch"></svg-icon>';
+        }
+        return `<div class="ref ${asTextContent(refTypeClass)}" title="${refTitle}">${remotePart}${iconPart}<span class="ref-part-name">${refName}</span></div>`;
       }
       function getEdges() {
         const xOffset = columnWidth / 2;

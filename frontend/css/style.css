@@ -1,6 +1,13 @@
 html, body {
   font-family: sans-serif;
 }
+svg-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  stroke: currentColor;
+  overflow: visible;
+}
 .graph-container {
   position: relative;
 }
@@ -56,15 +63,14 @@ html, body {
   z-index: 2;
 }
 .commit .ref {
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  gap: 0.25em;
   font-size: 11px;
   border: 1px solid rgb(0 0 0 / .15);
   border-radius: 3px;
   padding: 2px 4px;
   margin-right: 2px;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   background: rgb(255 255 255 / .6);
   transition-property: margin, border-color, padding;
   transition-duration: var(--transition-duration, 0);
@@ -84,6 +90,25 @@ html, body {
   border-color: rgb(27 121 57 / .3);
   color: rgb(0 88 28);
   /* background: rgba(215, 255, 228, 0.6); */
+}
+.commit .ref .ref-part-name {
+  display: inline-block;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Fix clipping of letters */
+  padding: 0 1px;
+}
+.commit .ref svg-icon {
+  width: 10px;
+  aspect-ratio: 1;
+  margin-top: 1px;
+  margin-bottom: -1px;
+}
+.commit .ref-remotes .ref-part-remote {
+}
+.commit .ref-stash {
+  font-style: italic;
 }
 .commit .ref-HEAD {
   color: red;
