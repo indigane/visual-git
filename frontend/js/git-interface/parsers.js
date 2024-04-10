@@ -245,7 +245,7 @@ export function parseFullRefPath(fullRefPath) {
   }
   else {
     return {
-      refType: null,
+      refType: fullRefPath,
       refName: fullRefPath,
     };
   }
