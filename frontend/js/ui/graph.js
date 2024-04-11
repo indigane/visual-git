@@ -305,7 +305,8 @@ function updateCommitElement(commitElement, context, oldContext) {
       edgeElement.style.removeProperty('display');
       edgeElement.setAttribute('d', edge.pathString);
       edgeElement.setAttribute('stroke-dasharray', edge.totalLength.toString());
-      edgeElement.style.stroke = edge.strokeColor;
+      // Edge needs its own color, because a node may have multiple different color edges starting from it.
+      edgeElement.style.setProperty('--color', edge.strokeColor);
     }
     else {
       edgeElement.style.display = 'none';
@@ -313,13 +314,14 @@ function updateCommitElement(commitElement, context, oldContext) {
   }
   if (oldContext?.subject !== context.subject) {
     commitElement._elems.message.textContent = context.subject;
+    commitElement._elems.message.setAttribute('data-commit-id', context.commitId.substring(0, 8));
   }
   commitElement._elems.refsContainer.replaceChildren();
 }
 
 
 function getViewportMinMaxRows() {
-  const columnWidth = 32;
+  const columnWidth = 24;
   const rowHeight = 32;
   const topOffset = 5;
   const bottomOffset = 5;
@@ -404,8 +406,9 @@ export class GraphElement extends HTMLElement {
     //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
     //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
     const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
-    const columnWidth = 32;
+    const columnWidth = 24;
     const rowHeight = 32;
+    const graphThicknessBase = 32;
     const redrawTransitionDurationMs = 1000;
     const maxRow = commits.length - 1;
     const knownCommitIdsForEnterLeaveAnimation = [];
@@ -416,6 +419,7 @@ export class GraphElement extends HTMLElement {
 
     commitsContainer.style.setProperty('--column-width', columnWidth + 'px');
     commitsContainer.style.setProperty('--row-height', rowHeight + 'px');
+    commitsContainer.style.setProperty('--graph-thickness-base', graphThicknessBase + 'px');
     commitsContainer.style.setProperty('--max-row', maxRow.toString());
 
     // Reverse mapping for refs
