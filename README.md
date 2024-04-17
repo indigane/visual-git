@@ -5,7 +5,7 @@ Visual Git is the Git GUI I've wished existed so I wouldn't have to write it mys
 Some ideas Visual Git may or may not be built on:
 
 - **See everything** you need without polling. Reduce mistakes by being aware of the state of your repository at all times.
-- **Interact with everything** you see. Visual git tries hard to never say "no", but also to keep you informed of the consequences.
+- **Interact with everything** you see. You should be allowed to do anything, while staying informed of the consequences of any action.
 - **Learn** git. Start from visually intuitive concepts and drill down all the way into git internals if you want to.
 
 
