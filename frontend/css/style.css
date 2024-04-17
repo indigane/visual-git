@@ -9,7 +9,7 @@ html, body {
   margin: 0;
   padding: 0;
 }
-/* 
+/* /*  */
 html {
   --text-color: 204 204 204;
   --background-color: 24 24 24;
@@ -35,8 +35,8 @@ svg-icon svg {
   --max-row: 1;
   height: calc(var(--max-row) * var(--row-height));
   z-index: 2;
-
-  /* --row-background-color: rgb(var(--text-color) / .05);
+  /* Striped background */
+  --row-background-color: rgb(var(--text-color) / .025);
   background-image: linear-gradient(
     to bottom,
     rgb(var(--text-color) / 0),
@@ -44,58 +44,7 @@ svg-icon svg {
     var(--row-background-color) 50%,
     var(--row-background-color)
   );
-  background-size: 1px calc(var(--row-height) * 2); */
-
-  /* --row-background-color: rgb(var(--text-color) / .05);
-  background-image: linear-gradient(
-    to bottom,
-    rgb(var(--background-color) / 1),
-    rgb(var(--background-color) / 1) 50%,
-    rgb(var(--background-color) / 0) 50%,
-    rgb(var(--background-color) / 0)
-  ),
-  linear-gradient(
-    to right,
-    rgb(var(--text-color) / 0),
-    var(--row-background-color) calc(var(--column-width) * 5),
-    var(--row-background-color) calc(100% - (var(--column-width) * 5)),
-    rgb(var(--text-color) / 0)
-  );
-  background-size: 1px calc(var(--row-height) * 2), calc(var(--column-width) * 50) 1px;
-  background-repeat: repeat, repeat-y;
-  background-position: 0 0, center 0; */
-
-  /* --row-background-color: rgb(var(--text-color) / .3);
-  background-image: linear-gradient(
-    to bottom,
-    rgb(var(--background-color) / 1),
-    rgb(var(--background-color) / 1) calc(var(--row-height) - 1px),
-    rgb(var(--background-color) / 0) var(--row-height),
-    rgb(var(--background-color) / 1) calc(var(--row-height) + 1px),
-    rgb(var(--background-color) / 1)
-  ),
-  linear-gradient(
-    to right,
-    rgb(var(--text-color) / 0),
-    rgb(var(--text-color) / 0) 4px,
-    var(--row-background-color) 4px,
-    var(--row-background-color)
-  );
-  background-size: 1px var(--row-height), 8px 1px;
-  background-repeat: repeat, repeat;
-  background-position: 0 calc(var(--row-height) / 2 + 1px), center 0; */
-
-  /* --row-background-color: rgb(var(--text-color) / .1);
-  background-image: linear-gradient(
-    to bottom,
-    rgb(var(--text-color) / 0),
-    rgb(var(--text-color) / 0) 10%,
-    var(--row-background-color) 40%,
-    var(--row-background-color) 60%,
-    rgb(var(--text-color) / 0) 90%
-  );
-  background-position-y: calc(var(--row-height) / -2);
-  background-size: 1px calc(var(--row-height) * 2); */
+  background-size: 1px calc(var(--row-height) * 2);
 }
 .refs {
   position: absolute;
@@ -247,29 +196,4 @@ svg-icon svg {
   transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
   white-space: nowrap;
-  /* text-decoration-line: underline overline;
-  text-decoration-style: wavy;
-  text-decoration-color: var(--color, currentColor); */
-  /* text-decoration-line: underline;
-  text-decoration-style: double;
-  text-decoration-color: var(--color, currentColor); */
-  /* text-decoration-line: underline;
-  text-decoration-thickness: 2px;
-  text-decoration-color: var(--color, currentColor); */
-  /* text-shadow: 0 0 2px var(--color, currentColor); */
 }
-.commit .message::before {
-  display: inline-block;
-  content: attr(data-commit-id);
-  margin-right: 0.5em;
-  padding: 0 0.5em;
-  color: #fff;
-  background-color: var(--color, currentColor);
-  font-family: monospace;
-  border-radius: 10px;
-}
-/* .commit .message::before {
-  content: "❧ ";
-  font-weight: bold;
-  color: var(--color, currentColor);
-} */
