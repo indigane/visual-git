@@ -15,7 +15,7 @@ Note that due to vendoring: Dependencies are updated manually. Dependencies **mu
 Visual Git uses the `git` binary itself to interact with the Git repositories.
 
 > <em>Why use</em> `git` <em> instead of an API?</em><br>
-The common alternative is to use `libgit2`. Both were considered but I chose `git` over `libgit2` for a few reasons. `libgit2` is a full rewrite of Git as a library and an API, which veers a bit too far from `git` for me. I started writing Visual Git to help me use Git more efficiently and also as a teaching tool. I want it to be an extension of the command line. Replicating familiar `git` commands in `libgit2` would require significant engineering effort. As of writing `libgit2` is working on their own CLI implementation of Git, which could help, but again I do not want to be dependent on `libgit2` and its progress, I'd rather depend on `git`.
+The common alternative is to use `libgit2`. Both were considered but I chose `git` over `libgit2` for a few reasons. `libgit2` is a full rewrite of Git as a library and an API, which veers a bit too far from `git` for me. I started writing Visual Git to help me use Git more efficiently and also as a teaching tool. I want it to be an extension of the command line. Replicating familiar `git` commands in `libgit2` would require significant engineering effort. As of writing `libgit2` is working on their own CLI implementation of Git, which could help, but again I do not want to be dependent on `libgit2` and its progress, I'd rather depend on `git`. Developing directly against `git` also helps me learn more about its capabilities, which I can hopefully translate into making Visual Git better.
 
 The trade-off from using `git` is that the interface is mostly meant for humans not applications. Another trade-off could be performance but the performance of `git` itself has improved a lot over time and may keep improving.
 
@@ -33,7 +33,7 @@ The server should have low trust in the web user interface. Some trust will be n
 | `bin/` | Contains the `vg` command for Windows and Linux. |
 | `runtime/` | Currently the location for the `node` binary. |
 
-_Why a dedicated_ `node` _binary?_<br>The same way I do not like messing with `npm`, I would rather just download the binary because I know that it will always work. There may be alternative methods in the future.
+> <em>Why a dedicated</em> `node` <em>binary?</em><br>The same way I do not like messing with `npm`, I would rather just download the binary because I know that it will always work. There may be alternative methods in the future.
 
 ## Web user interface
 
