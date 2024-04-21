@@ -35,8 +35,11 @@ svg-icon svg {
   --max-row: 1;
   height: calc(var(--max-row) * var(--row-height));
   z-index: 2;
+}
+.commits.striped-background {
   /* Striped background */
-  --row-background-color: rgb(var(--text-color) / .025);
+  --striped-background-opacity: 0.025;
+  --row-background-color: rgb(var(--text-color) / var(--striped-background-opacity));
   background-image: linear-gradient(
     to bottom,
     rgb(var(--text-color) / 0),
@@ -80,6 +83,7 @@ svg-icon svg {
   position: absolute;
   right: 100%;
   transform: translateX(calc(var(--column-width) * var(--column) + var(--column-width) / 3));
+  transform: translateX(0);
   transition-property: transform;
   transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
@@ -158,12 +162,13 @@ svg-icon svg {
   }
 }
 .commit .graph {
+  --offset-left: calc(var(--column-width) * var(--column));
+  --stroke-width: calc(var(--graph-thickness-base) / 16);
   width: var(--graph-width);
   min-width: var(--graph-width);
   height: var(--row-height);
 }
 .commit .graph svg {
-  --offset-left: calc(var(--column-width) * var(--column));
   width: var(--column-width);
   height: var(--row-height);
   overflow: visible;
@@ -179,7 +184,6 @@ svg-icon svg {
   transition-timing-function: ease-in-out;
 }
 .commit .graph .edge {
-  --stroke-width: calc(var(--graph-thickness-base) / 16);
   stroke: var(--color, currentColor);
   stroke-width: var(--stroke-width);
   fill: transparent;
@@ -187,6 +191,14 @@ svg-icon svg {
   transition-property: d, stroke, stroke-width, stroke-dasharray;
   transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
+}
+.commit .graph .guide {
+  --striped-background-opacity: 0.2;
+  --row-background-color: rgb(var(--text-color) / var(--striped-background-opacity));
+  stroke: var(--row-background-color);
+  stroke-width: 1px;
+  stroke-dasharray: 4 4;
+  shape-rendering: crispEdges;
 }
 .commit .message {
   position: absolute;
