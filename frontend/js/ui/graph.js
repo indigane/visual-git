@@ -227,14 +227,13 @@ const commitElementPool = {
 /**
  * Context data for rendering a CommitElement.
  * @typedef {Object} CommitContext
+ * @property {Commit} commit The commit object.
  * @property {number} row The row index.
  * @property {number} column The column index.
  * @property {string} color The CSS color of the node and edges.
- * @property {string} commitId The ID of the commit.
  * @property {string[]} childCommitIds The IDs of the child commits.
  * @property {number[]} parentCommitRows The row indices of the parent commits.
  * @property {EdgeContext[]} edges The context for the edges.
- * @property {string} subject The subject of the commit.
  * @property {number} maxColumn The maximum column index.
  * @property {Reference[]} refs The references pointing to this commit.
  * @property {string} [transitionDuration] The duration of transition animation as CSS duration string.
@@ -261,6 +260,9 @@ const commitElementPool = {
  *   _elems: {
  *     edges: (SVGElement | null)[]
  *     message: Element | null
+ *     identifier: Element | null
+ *     author: Element | null
+ *     timestamp: Element | null
  *     refsContainer: Element | null
  *   }
  *   _boundCommitId: string
@@ -278,6 +280,9 @@ function createCommitElement() {
   commitElement._elems = {
     edges: /** @type {SVGElement[]} */([...commitElement.querySelectorAll('.edge')]),
     message: commitElement.querySelector('.message'),
+    identifier: commitElement.querySelector('.identifier'),
+    author: commitElement.querySelector('.author'),
+    timestamp: commitElement.querySelector('.timestamp'),
     refsContainer: commitElement.querySelector('.refs'),
   };
   return commitElement;
@@ -298,7 +303,7 @@ function updateCommitElement(commitElement, context, oldContext) {
   commitElement.style.setProperty('--column', context.column.toString());
   commitElement.style.setProperty('--color', context.color);
   commitElement.style.setProperty('--max-column', context.maxColumn.toString());
-  commitElement.setAttribute('data-commit-id', context.commitId);
+  commitElement.setAttribute('data-commit-id', context.commit.id);
   for (const [index, edgeElement] of commitElement._elems.edges.entries()) {
     const edge = context.edges[index];
     if (edge) {
@@ -312,9 +317,13 @@ function updateCommitElement(commitElement, context, oldContext) {
       edgeElement.style.display = 'none';
     }
   }
-  if (oldContext?.subject !== context.subject) {
-    commitElement._elems.message.textContent = context.subject;
-    commitElement._elems.message.setAttribute('data-commit-id', context.commitId.substring(0, 8));
+  if (oldContext?.commit.subject !== context.commit.subject) {
+    commitElement._elems.message.textContent = context.commit.subject;
+  }
+  if (oldContext?.commit.id !== context.commit.id) {
+    commitElement._elems.identifier.textContent = context.commit.id.substring(0, 8);
+    commitElement._elems.author.textContent = context.commit.authorName;
+    commitElement._elems.timestamp.textContent = context.commit.authorDate.toISOString().replace('T', ' ').split('.')[0];
   }
   commitElement._elems.refsContainer.replaceChildren();
 }
@@ -792,14 +801,13 @@ export class GraphElement extends HTMLElement {
       const edges = getEdges();
       /** @type {CommitContext} */
       const newCommitContext = {
+        commit: commit,
         row: node.row,
         column: node.path.columnIndex,
         color,
-        commitId: commit.id,
         childCommitIds: node.children.map(childNode => childNode.commit.id),
         parentCommitRows: commit.parents.map(parentId => nodeForCommitId.get(parentId)?.row ?? maxRow),
         edges,
-        subject: commit.subject,
         maxColumn,
         refs: commitRefs,
       };
