@@ -317,27 +317,6 @@ function updateCommitElement(commitElement, context, oldContext) {
     commitElement._elems.message.setAttribute('data-commit-id', context.commitId.substring(0, 8));
   }
   commitElement._elems.refsContainer.replaceChildren();
-
-  // uli uli
-  const columnWidth = 24;
-  const rowHeight = 32;
-  const radius = rowHeight / 10;
-  /** @type {HTMLElement} */
-  const refsGuide = commitElement.querySelector('.guide-refs');
-  if (context.refs.length > 0) {
-    refsGuide.style.removeProperty('display');
-    const start = radius;
-    const end = context.column * columnWidth + columnWidth / 2 - radius * 2;
-    refsGuide.setAttribute('d', `M ${start} ${rowHeight / 2} L ${end} ${rowHeight / 2}`);
-  }
-  else {
-    refsGuide.style.display = 'none';
-  }
-  /** @type {HTMLElement} */
-  const messageGuide = commitElement.querySelector('.guide-message');
-  const start = context.column * columnWidth + columnWidth / 2 + radius * 2;
-  const end = context.maxColumn * columnWidth - radius;
-  messageGuide.setAttribute('d', `M ${start} ${rowHeight / 2} L ${end} ${rowHeight / 2}`);
 }
 
 
