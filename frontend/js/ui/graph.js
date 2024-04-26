@@ -419,12 +419,15 @@ export class GraphElement extends HTMLElement {
     commitsContainer.style.setProperty('--max-row', maxRow.toString());
 
     // Reverse mapping for refs
-    /** @type {Object.<string, Reference[]>} */
-    const refsByCommitId = {};
-    const priorityPathIds = [];
+    /** @type {Object.<string, Reference[]>} */ const refsByCommitId = {};
+    /** @type {Object.<string, number>} */ const pathRefPriorityForCommitId = {};
     const namePriorities = [
-      /^(.+\/)?(master|main|trunk|default)$/i,
-      /^(.+\/)?(develop|development)$/i,
+      /^(.+\/)?(master)$/i,
+      /^(.+\/)?(main)$/i,
+      /^(.+\/)?(trunk)$/i,
+      /^(.+\/)?(default)$/i,
+      /^(.+\/)?(develop)$/i,
+      /^(.+\/)?(development)$/i,
     ];
     for (const ref of Object.values(refs)) {
       if (refsByCommitId[ref.commitId] === undefined) {
@@ -433,10 +436,10 @@ export class GraphElement extends HTMLElement {
       refsByCommitId[ref.commitId].push(ref);
       for (const [index, namePriorityRegex] of [...namePriorities.entries()]) {
         if (namePriorityRegex?.test(ref.refName)) {
-          priorityPathIds.push(ref.commitId);
+          pathRefPriorityForCommitId[ref.commitId] = namePriorities.length - index;
           // These are used to split paths. To avoid splitting for example
           // main multiple times, remove it after the first occurrence.
-          namePriorities.splice(index, 1);
+          namePriorities[index] = undefined;
         }
       }
     }
@@ -471,10 +474,11 @@ export class GraphElement extends HTMLElement {
       }
       // Place node on a path
       let path;
-      const shouldCreateNewPath = priorityPathIds.includes(commit.id);
+      const pathRefPriority = pathRefPriorityForCommitId[commit.id];
+      const shouldCreateNewPath = pathRefPriority !== undefined;
       if (shouldCreateNewPath) {
         path = createPath(commit.id);
-        path.priorityForNodes = 1;
+        path.priorityForNodes = pathRefPriority;
       } else {
         path = getOrCreatePathForCommitId(commit.id);
       }
