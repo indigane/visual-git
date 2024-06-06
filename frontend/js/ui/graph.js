@@ -600,12 +600,42 @@ export class GraphElement extends HTMLElement {
 
     // Select columns for paths
     const columns = [];
+    const highToLowMergeEdgeColumnIndices = {};
     for (const [pathIndex, path] of paths.entries()) {
       const pathStart = path.getExtendedStartIndex();
       const pathEnd = path.getExtendedEndIndex();
       const minColumnIndex = path.getPrimaryParentPath()?.columnIndex ?? 0;
       let selectedColumnIndex = undefined;
-      for (const column of columns) {
+      const columnIterator = columns.values();
+
+      const assignColumnsForHighToLowMergeEdges = function(column) {
+        // Look for merges from higher priority paths into this path
+        // and give them their own columns.
+        for (const node of path.nodes) {
+          const secondaryParents = node.parents.slice(1);
+          for (const parentNode of secondaryParents) {
+            const parentHasPriority = parentNode.path.columnIndex !== undefined && parentNode.path.columnIndex < column.columnIndex;
+            if ( ! parentHasPriority) {
+              continue;
+            }
+            // Assign current column to the merge edge
+            column.occupiedRanges.push({start: node.row, end: parentNode.row});
+            highToLowMergeEdgeColumnIndices[`${node.row}-${parentNode.row}`] = column.columnIndex;
+            // Set the next column as the current column or create a new one if we are out of columns
+            const next = columnIterator.next();
+            if (next.done) {
+              column = {
+                columnIndex: columns.length,
+                occupiedRanges: [],
+              };
+              columns.push(column);
+            }
+          }
+        }
+        return column;
+      };
+
+      for (let column of columnIterator) {
         if (column.columnIndex < minColumnIndex) {
           continue;
         }
@@ -620,17 +650,22 @@ export class GraphElement extends HTMLElement {
           continue;
         }
         else {
+          column = assignColumnsForHighToLowMergeEdges(column);
+          // Assign column for path
           column.occupiedRanges.push({start: pathStart, end: pathEnd});
           selectedColumnIndex = column.columnIndex;
           break;
         }
       }
       if (selectedColumnIndex === undefined) {
-        const column = {
+        let column = {
           columnIndex: columns.length,
-          occupiedRanges: [{start: pathStart, end: pathEnd}],
+          occupiedRanges: [],
         };
         columns.push(column);
+        column = assignColumnsForHighToLowMergeEdges(column);
+        // Assign column for path
+        column.occupiedRanges.push({start: pathStart, end: pathEnd});
         selectedColumnIndex = column.columnIndex;
       }
       path.columnIndex = selectedColumnIndex;
@@ -691,6 +726,7 @@ export class GraphElement extends HTMLElement {
         for (const [parentIndex, parentId] of commit.parents.entries()) {
           const isPrimaryParent = parentIndex === 0;
           const parentNode = nodeForCommitId.get(parentId);
+          const parentHasPriority = parentNode.path.columnIndex < node.path.columnIndex;
           const pathCommands = [];
           let strokeColor = colors[0];
           if (parentNode === undefined) {
@@ -730,8 +766,25 @@ export class GraphElement extends HTMLElement {
             pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
             strokeColor = colors[node.path.columnIndex % colors.length];
           }
+          else if (parentHasPriority) {
+            // Edge is diverging from top right to bottom left. Draw a line with a corner.
+            // From a high priority path to a low priority path. For example merge main to develop.
+            const edgeColumnIndex = highToLowMergeEdgeColumnIndices[`${node.row}-${parentNode.row}`];
+            const startX = node.path.columnIndex;
+            const startY = 0;
+            pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
+            const cornerX = edgeColumnIndex;
+            const cornerY = 0;
+            pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset + cornerOffset}`);
+            const endX = parentNode.path.columnIndex;
+            const endY = parentNode.row - node.row;
+            pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${endY * rowHeight + yOffset - cornerOffset}`);
+            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
+            strokeColor = colors[parentNode.path.columnIndex % colors.length];
+          }
           else {
-            // Edge is diverging. Draw a line with a corner.
+            // Edge is diverging from top left to bottom right. Draw a line with a corner.
+            // From a low priority path to a high priority path. For example merge develop to main.
             const startX = node.path.columnIndex;
             const startY = 0;
             pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
