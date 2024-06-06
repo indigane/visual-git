@@ -5,12 +5,16 @@ html {
   --background-color: 255 255 255;
   background-color: rgb(var(--background-color));
 }
-/*
+html, body {
+  margin: 0;
+  padding: 0;
+}
+/* 
 html {
   --text-color: 204 204 204;
   --background-color: 24 24 24;
 }
-*/
+/* */
 svg-icon svg {
   width: 100%;
   height: 100%;
@@ -23,41 +27,57 @@ svg-icon svg {
 }
 .commits {
   position: relative;
+  container: commits-container / inline-size;
   contain: size layout style;
   --max-column: 1;
   --column-width: 32px;
   --row-height: 32px;
+  --graph-thickness-base: var(--row-height);
   --max-row: 1;
+  width: 100%;
   height: calc(var(--max-row) * var(--row-height));
   z-index: 2;
 }
-.refs {
-  position: absolute;
+.commits.striped-background {
+  /* Striped background */
+  --striped-background-opacity: 0.025;
+  --row-background-color: rgb(var(--text-color) / var(--striped-background-opacity));
+  background-image: linear-gradient(
+    to bottom,
+    rgb(var(--text-color) / 0),
+    rgb(var(--text-color) / 0) 50%,
+    var(--row-background-color) 50%,
+    var(--row-background-color)
+  );
+  background-size: 1px calc(var(--row-height) * 2);
 }
-.commit {
-  --row: 0;
-  --column: 0;
-  --max-graph-width: 50vw;
-  --graph-width: min(calc(var(--column-width) * var(--max-column)), var(--max-graph-width));
-  contain: size layout style;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  height: var(--row-height);
-  width: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform: translateY(calc(var(--row) * var(--row-height))) translateX(calc(50vw - var(--graph-width) / 2));
-  transition-property: transform;
-  transition-duration: var(--transition-duration, 0);
-  transition-timing-function: ease-in-out;
-  z-index: var(--row);
-}
-@supports (width: round(1px, 1px)) {
-  /* Fix blurry SVG for browsers that support round() */
+@container commits-container (width > 0) {
   .commit {
-    transform: translateY(calc(var(--row) * var(--row-height))) translateX(calc(round(50vw - var(--graph-width) / 2, 1px)));
+    --row: 0;
+    --column: 0;
+    --max-graph-width: 50cqw;
+    --commits-container-width: 100cqw;
+    --graph-width: min(calc(var(--column-width) * var(--max-column)), var(--max-graph-width));
+    contain: size layout style;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: var(--row-height);
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: translateY(calc(var(--row) * var(--row-height))) translateX(calc(50cqw - var(--graph-width) / 2));
+    transition-property: transform;
+    transition-duration: var(--transition-duration, 0);
+    transition-timing-function: ease-in-out;
+    z-index: var(--row);
+  }
+  @supports (width: round(1px, 1px)) {
+    /* Fix blurry SVG for browsers that support round() */
+    .commit {
+      transform: translateY(calc(var(--row) * var(--row-height))) translateX(calc(round(50cqw - var(--graph-width) / 2, 1px)));
+    }
   }
 }
 .commit .refs {
@@ -148,38 +168,79 @@ svg-icon svg {
   height: var(--row-height);
 }
 .commit .graph svg {
-  --size: var(--row-height);
   --offset-left: calc(var(--column-width) * var(--column));
-  width: var(--size);
-  height: var(--size);
+  width: var(--column-width);
+  height: var(--row-height);
   overflow: visible;
 }
 .commit .graph circle {
-  --radius: calc(var(--size) / 10);
+  --radius: calc(var(--graph-thickness-base) / 10);
   fill: var(--color, currentColor);
-  cx: calc(var(--size) / 2 + var(--offset-left));
-  cy: calc(var(--size) / 2);
+  cx: calc(var(--column-width) / 2 + var(--offset-left));
+  cy: calc(var(--row-height) / 2);
   r: var(--radius);
   transition-property: fill, cx, cy;
   transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
 }
 .commit .graph .edge {
-  --stroke-width: calc(var(--size) / 16);
-  stroke: black;
+  --stroke-width: calc(var(--graph-thickness-base) / 16);
+  stroke: var(--color, currentColor);
   stroke-width: var(--stroke-width);
   fill: transparent;
-  stroke-dashoffset: calc(-1 * var(--size) / 6.4);
+  stroke-dashoffset: calc(-1 * var(--graph-thickness-base) / 6.4);
   transition-property: d, stroke, stroke-width, stroke-dasharray;
   transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
 }
-.commit .message {
+.commit .metadata {
+  display: flex;
   position: absolute;
   left: 0;
+  --width: calc(var(--commits-container-width) / 2 - var(--graph-width) / 2);
+  --padding-width: 0.3em;
+  --border-width: 2px;
+  --identifier-width: calc(8ch + var(--padding-width) * 2 + var(--border-width) * 2);
+  --timestamp-width: calc(18ch + var(--padding-width) * 2 + var(--border-width) * 2);
+  --author-width: calc(18ch + var(--padding-width) * 2 + var(--border-width) * 2);
+  --message-width: calc(var(--width) - var(--identifier-width) - var(--timestamp-width) - var(--author-width));
+  width: var(--width);
+  max-width: var(--width);
   transform: translateX(var(--graph-width));
   transition-property: transform;
   transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
   white-space: nowrap;
+}
+.commit .metadata > * {
+  padding: 0 var(--padding-width);
+  border-left: var(--border-width) solid var(--color);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.commit .message {
+  width: var(--message-width);
+  min-width: 40ch;
+  max-width: var(--message-width);
+}
+.commit .identifier {
+  font-family: monospace;
+  font-size: 110%;
+  width: var(--identifier-width);
+  min-width: var(--identifier-width);
+  max-width: var(--identifier-width);
+  text-align: center;
+}
+.commit .author {
+  width: max-content;
+  min-width: 8ch;
+  max-width: max-content;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+.commit .timestamp {
+  width: var(--timestamp-width);
+  min-width: var(--timestamp-width);
+  max-width: var(--timestamp-width);
 }
