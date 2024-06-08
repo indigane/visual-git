@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "es2018",
-    "lib": ["es2018", "dom", "dom.iterable"],
+    "target": "es2022",
+    "lib": ["es2022", "esnext", "dom", "dom.iterable"],
     "checkJs": true,
     "noEmit": true
   },

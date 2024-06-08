@@ -13,7 +13,7 @@ export default class Commit {
   /**
    * @param {object} props Commit properties.
    * @param {string} props.id The commit ID.
-   * @param {string[]} props.parents The parent commit IDs.
+   * @param {string[]} [props.parents] The parent commit IDs.
    * @param {string} [props.authorName] The name of the author.
    * @param {string} [props.authorEmail] The email of the author.
    * @param {Date} [props.authorDate] The date when the author made the commit.

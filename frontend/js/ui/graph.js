@@ -150,12 +150,13 @@ class Node {
   /** @type {Path} */ path;
   /** @type {Node[]} */ children;
   /** @type {Node[]} */ parents;
-  constructor({commit, path, row}) {
+  constructor({commit, path, row, isPlaceholder = false}) {
     this.commit = commit;
     this.path = path;
     this.row = row;
     this.children = [];
     this.parents = [];
+    this.isPlaceholder = isPlaceholder;
   }
 }
 
@@ -534,6 +535,14 @@ export class GraphElement extends HTMLElement {
           if (parentNode !== undefined) {
             childNode.parents[parentIndex] = parentNode;
           }
+          else {
+            childNode.parents[parentIndex] = new Node({
+              commit: new Commit({id: parentId}),
+              path: null,
+              row: maxRow,
+              isPlaceholder: true,
+            });
+          }
         }
       }
       // Add path name candidates from refs
@@ -600,7 +609,7 @@ export class GraphElement extends HTMLElement {
 
     // Select columns for paths
     const columns = [];
-    const highToLowMergeEdgeColumnIndices = {};
+    const nodelessPathColumnIndices = {};
     for (const [pathIndex, path] of paths.entries()) {
       const pathStart = path.getExtendedStartIndex();
       const pathEnd = path.getExtendedEndIndex();
@@ -609,36 +618,62 @@ export class GraphElement extends HTMLElement {
       const columnIterator = columns.values();
 
       const assignColumnsForHighToLowMergeEdges = function(column) {
-        // Look for merges from higher priority paths into this path
-        // and give them their own columns.
+        // Look for merges from higher priority paths into this path and give them their own columns.
         for (const node of path.nodes) {
           const secondaryParents = node.parents.slice(1);
-          for (const parentNode of secondaryParents) {
+          const parentsWithPath = secondaryParents.filter(node => node.path !== null);
+          for (const parentNode of parentsWithPath) {
             const parentHasPriority = parentNode.path.columnIndex !== undefined && parentNode.path.columnIndex < column.columnIndex;
             if ( ! parentHasPriority) {
               continue;
             }
-            // Assign current column to the merge edge
-            column.occupiedRanges.push({start: node.row, end: parentNode.row});
-            highToLowMergeEdgeColumnIndices[`${node.row}-${parentNode.row}`] = column.columnIndex;
-            // Set the next column as the current column or create a new one if we are out of columns
-            const next = columnIterator.next();
-            if (next.done) {
-              column = {
-                columnIndex: columns.length,
-                occupiedRanges: [],
-              };
-              columns.push(column);
+            const range = {start: node.row, end: parentNode.row};
+            while (getIsOverlappingOccupiedRange(column, range.start, range.end)) {
+              column = getNextColumn(columnIterator);
             }
+            column.occupiedRanges.push(range);
+            nodelessPathColumnIndices[`${node.row}-${parentNode.row}`] = column.columnIndex;
+            column = getNextColumn(columnIterator);
+          }
+        }
+        // Look for merges with unknown parents and give them their own columns.
+        // Reversed order makes the edges nest instead of cross each other.
+        for (const node of path.nodes.toReversed()) {
+          const secondaryParents = node.parents.slice(1);
+          const parentsWithoutPath = secondaryParents.filter(node => node.path === null);
+          for (const parentNode of parentsWithoutPath) {
+            if (parentNode.path !== null) {
+              continue;
+            }
+            const range = {start: node.row, end: parentNode.row};
+            let nextColumn = getNextColumn(columnIterator);
+            while (getIsOverlappingOccupiedRange(nextColumn, range.start, range.end)) {
+              nextColumn = getNextColumn(columnIterator);
+            }
+            nodelessPathColumnIndices[`${node.row}-${parentNode.row}`] = nextColumn.columnIndex;
+            nextColumn.occupiedRanges.push(range);
           }
         }
         return column;
       };
 
-      for (let column of columnIterator) {
-        if (column.columnIndex < minColumnIndex) {
-          continue;
+      const getNextColumn = function(columnIterator) {
+        let nextColumn;
+        const next = columnIterator.next();
+        if (next.done) {
+          nextColumn = {
+            columnIndex: columns.length,
+            occupiedRanges: [],
+          };
+          columns.push(nextColumn);
         }
+        else {
+          nextColumn = next.value;
+        }
+        return nextColumn;
+      };
+
+      const getIsOverlappingOccupiedRange = function(column, pathStart, pathEnd) {
         let isOverlappingOccupiedRange = false;
         for (const {start, end} of column.occupiedRanges) {
           if (pathStart < end && pathEnd > start) {
@@ -646,7 +681,14 @@ export class GraphElement extends HTMLElement {
             break;
           }
         }
-        if (isOverlappingOccupiedRange) {
+        return isOverlappingOccupiedRange;
+      };
+
+      for (let column of columnIterator) {
+        if (column.columnIndex < minColumnIndex) {
+          continue;
+        }
+        if (getIsOverlappingOccupiedRange(column, pathStart, pathEnd)) {
           continue;
         }
         else {
@@ -726,10 +768,10 @@ export class GraphElement extends HTMLElement {
         for (const [parentIndex, parentId] of commit.parents.entries()) {
           const isPrimaryParent = parentIndex === 0;
           const parentNode = nodeForCommitId.get(parentId);
-          const parentHasPriority = parentNode.path.columnIndex < node.path.columnIndex;
+          const parentHasPriority = parentNode !== undefined ? parentNode.path.columnIndex < node.path.columnIndex : false;
           const pathCommands = [];
           let strokeColor = colors[0];
-          if (parentNode === undefined) {
+          if (isPrimaryParent && parentNode === undefined) {
             // Parent has not been parsed yet. Draw a simple line through the bottom of the graph.
             const startX = node.path.columnIndex;
             const startY = 0;
@@ -740,6 +782,22 @@ export class GraphElement extends HTMLElement {
             // Duplicate the end point for animations as they require a consistent number of points to transition.
             pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
             strokeColor = colors[node.path.columnIndex % colors.length];
+          }
+          else if (parentNode === undefined) {
+            // Parent has not been parsed yet. Draw a line with a corner through the bottom of the graph.
+            const edgeColumnIndex = nodelessPathColumnIndices[`${node.row}-${maxRow}`];
+            const startX = node.path.columnIndex;
+            const startY = 0;
+            pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
+            const cornerX = edgeColumnIndex;
+            const cornerY = 0;
+            pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset + cornerOffset}`);
+            const endX = edgeColumnIndex;
+            const endY = maxRow + 1 - node.row;
+            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
+            // Duplicate the end point for animations as they require a consistent number of points to transition.
+            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
+            strokeColor = colors[edgeColumnIndex % colors.length];
           }
           else if (node.path === parentNode.path) {
             // Edge is within the same path. Draw a simple line.
@@ -769,7 +827,7 @@ export class GraphElement extends HTMLElement {
           else if (parentHasPriority) {
             // Edge is diverging from top right to bottom left. Draw a line with a corner.
             // From a high priority path to a low priority path. For example merge main to develop.
-            const edgeColumnIndex = highToLowMergeEdgeColumnIndices[`${node.row}-${parentNode.row}`];
+            const edgeColumnIndex = nodelessPathColumnIndices[`${node.row}-${parentNode.row}`];
             const startX = node.path.columnIndex;
             const startY = 0;
             pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
