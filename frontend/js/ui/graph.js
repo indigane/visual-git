@@ -131,7 +131,7 @@ class Path {
   }
   getMergeCountPriority() {
     if (this.mergeCount === 0) {
-      return this.getPrimaryParentPath()?.mergeCount ?? this.mergeCount;
+      return this.getPrimaryParentPath()?.getMergeCountPriority() ?? this.mergeCount;
     }
     return this.mergeCount;
   }
