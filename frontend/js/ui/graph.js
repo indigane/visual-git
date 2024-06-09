@@ -604,7 +604,13 @@ export class GraphElement extends HTMLElement {
       }
       const pathALength = pathA.getExtendedEndIndex() - pathA.getExtendedStartIndex();
       const pathBLength = pathB.getExtendedEndIndex() - pathB.getExtendedStartIndex();
-      return pathALength - pathBLength;
+      // If both paths are open, prioritize longer paths.
+      if (pathAIsOpen && pathBIsOpen) {
+        return pathBLength - pathALength;
+      }
+      else {
+        return pathALength - pathBLength;
+      }
     });
 
     // Select columns for paths
@@ -623,6 +629,13 @@ export class GraphElement extends HTMLElement {
           const secondaryParents = node.parents.slice(1);
           const parentsWithPath = secondaryParents.filter(node => node.path !== null);
           for (const parentNode of parentsWithPath) {
+            // If node and parentNode are on adjacent rows,
+            // skip reserving a separate column for merge edge.
+            // It would not look good and is unnecessary.
+            const nodesAreAdjacent = node.row === parentNode.row - 1;
+            if (nodesAreAdjacent) {
+              continue;
+            }
             const parentHasPriority = parentNode.path.columnIndex !== undefined && parentNode.path.columnIndex < column.columnIndex;
             if ( ! parentHasPriority) {
               continue;
@@ -633,7 +646,7 @@ export class GraphElement extends HTMLElement {
             }
             column.occupiedRanges.push(range);
             nodelessPathColumnIndices[`${node.row}-${parentNode.row}`] = column.columnIndex;
-            while (getIsOverlappingOccupiedRange(column, range.start, range.end)) {
+            while ( ! getIsColumnValidForPath(column, pathStart, pathEnd)) {
               column = getNextColumn(columnIterator);
             }
           }
@@ -686,11 +699,18 @@ export class GraphElement extends HTMLElement {
         return isOverlappingOccupiedRange;
       };
 
-      for (let column of columnIterator) {
+      const getIsColumnValidForPath = function(column, pathStart, pathEnd) {
         if (column.columnIndex < minColumnIndex) {
-          continue;
+          return false;
         }
         if (getIsOverlappingOccupiedRange(column, pathStart, pathEnd)) {
+          return false;
+        }
+        return true;
+      };
+
+      for (let column of columnIterator) {
+        if ( ! getIsColumnValidForPath(column, pathStart, pathEnd)) {
           continue;
         }
         else {
@@ -771,6 +791,7 @@ export class GraphElement extends HTMLElement {
           const isPrimaryParent = parentIndex === 0;
           const parentNode = nodeForCommitId.get(parentId);
           const parentHasPriority = parentNode !== undefined ? parentNode.path.columnIndex < node.path.columnIndex : false;
+          const edgeHasOwnColumn = parentNode === undefined ? `${node.row}-${maxRow}` in nodelessPathColumnIndices : `${node.row}-${parentNode.row}` in nodelessPathColumnIndices;
           const pathCommands = [];
           let strokeColor = colors[0];
           if (isPrimaryParent && parentNode === undefined) {
@@ -826,7 +847,7 @@ export class GraphElement extends HTMLElement {
             pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
             strokeColor = colors[node.path.columnIndex % colors.length];
           }
-          else if (parentHasPriority) {
+          else if (parentHasPriority && edgeHasOwnColumn) {
             // Edge is diverging from top right to bottom left. Draw a line with a corner.
             // From a high priority path to a low priority path. For example merge main to develop.
             const edgeColumnIndex = nodelessPathColumnIndices[`${node.row}-${parentNode.row}`];
