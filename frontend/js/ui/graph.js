@@ -633,7 +633,9 @@ export class GraphElement extends HTMLElement {
             }
             column.occupiedRanges.push(range);
             nodelessPathColumnIndices[`${node.row}-${parentNode.row}`] = column.columnIndex;
-            column = getNextColumn(columnIterator);
+            while (getIsOverlappingOccupiedRange(column, range.start, range.end)) {
+              column = getNextColumn(columnIterator);
+            }
           }
         }
         // Look for merges with unknown parents and give them their own columns.
