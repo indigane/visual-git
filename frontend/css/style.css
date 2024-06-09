@@ -193,6 +193,14 @@ svg-icon svg {
   transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
 }
+.commit .graph .edge.has-marker {
+  stroke-dashoffset: calc(-1.8 * var(--graph-thickness-base) / 6.4);
+}
+.commit .graph .arrow-marker {
+  transition-property: fill;
+  transition-duration: var(--transition-duration, 0);
+  transition-timing-function: ease-in-out;
+}
 .commit .metadata {
   display: flex;
   position: absolute;

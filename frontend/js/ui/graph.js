@@ -260,6 +260,7 @@ const commitElementPool = {
  * @typedef {HTMLElement & {
  *   _elems: {
  *     edges: (SVGElement | null)[]
+ *     arrowMarker: SVGElement | null
  *     message: Element | null
  *     identifier: Element | null
  *     author: Element | null
@@ -280,6 +281,7 @@ function createCommitElement() {
   commitsContainer.appendChild(commitElement);
   commitElement._elems = {
     edges: /** @type {SVGElement[]} */([...commitElement.querySelectorAll('.edge')]),
+    arrowMarker: /** @type {SVGElement} */(commitElement.querySelector('.arrow-marker')),
     message: commitElement.querySelector('.message'),
     identifier: commitElement.querySelector('.identifier'),
     author: commitElement.querySelector('.author'),
@@ -296,6 +298,7 @@ function createCommitElement() {
  * @param {CommitContext} [oldContext]
  */
 function updateCommitElement(commitElement, context, oldContext) {
+  const graphThicknessBase = 32;
   // Remove `display: none;` because new and reused commit elements are initially hidden.
   commitElement.style.removeProperty('display');
   commitElement._context = context;
@@ -313,6 +316,18 @@ function updateCommitElement(commitElement, context, oldContext) {
       edgeElement.setAttribute('stroke-dasharray', edge.totalLength.toString());
       // Edge needs its own color, because a node may have multiple different color edges starting from it.
       edgeElement.style.setProperty('--color', edge.strokeColor);
+      if (index > 0) {
+        const markerId = `arrow-marker-${context.commit.id}-${index}`;
+        commitElement._elems.arrowMarker.setAttribute('id', markerId);
+        commitElement._elems.arrowMarker.setAttribute('fill', edge.strokeColor);
+        commitElement._elems.arrowMarker.setAttribute('markerWidth', (graphThicknessBase / 10).toString());
+        commitElement._elems.arrowMarker.setAttribute('markerHeight', (graphThicknessBase / 10).toString());
+        edgeElement.setAttribute('marker-start', `url(#${markerId})`);
+        edgeElement.classList.add('has-marker');
+      } else {
+        edgeElement.removeAttribute('marker-start');
+        edgeElement.classList.remove('has-marker');
+      }
     }
     else {
       edgeElement.style.display = 'none';
