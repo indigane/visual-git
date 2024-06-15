@@ -158,6 +158,14 @@ class Node {
     this.parents = [];
     this.isPlaceholder = isPlaceholder;
   }
+  getPreviousNodeInPath() {
+    const thisIndex = this.path.nodes.indexOf(this);
+    return this.path.nodes[thisIndex - 1] ?? null;
+  }
+  getNextNodeInPath() {
+    const thisIndex = this.path.nodes.indexOf(this);
+    return this.path.nodes[thisIndex + 1] ?? null;
+  }
 }
 
 
@@ -644,11 +652,10 @@ export class GraphElement extends HTMLElement {
           const secondaryParents = node.parents.slice(1);
           const parentsWithPath = secondaryParents.filter(node => node.path !== null);
           for (const parentNode of parentsWithPath) {
-            // If node and parentNode are on adjacent rows,
-            // skip reserving a separate column for merge edge.
-            // It would not look good and is unnecessary.
-            const nodesAreAdjacent = node.row === parentNode.row - 1;
-            if (nodesAreAdjacent) {
+            // If there is a node within the parentNode's Path between the parentNode and this node
+            // then the merge edge would overlap that node and will need its own column. Otherwise skip as its not needed.
+            const edgeWouldOverlapNodes = node.row < parentNode.getPreviousNodeInPath()?.row;
+            if ( ! edgeWouldOverlapNodes) {
               continue;
             }
             const parentHasPriority = parentNode.path.columnIndex !== undefined && parentNode.path.columnIndex < column.columnIndex;
