@@ -67,6 +67,15 @@ class Path {
     const lastNode = this.nodes.slice(-1)[0];
     return lastNode.parents[0]?.path;
   }
+  getAncestorCount() {
+    let ancestorPath = this.getPrimaryParentPath();
+    let ancestorCount = 0;
+    while(ancestorPath) {
+      ancestorCount += 1;
+      ancestorPath = ancestorPath.getPrimaryParentPath();
+    }
+    return ancestorCount;
+  }
   _getInferredName() {
     const namePriorities = [
       /^(.+\/)?(master|main|trunk|default)$/i,
@@ -599,7 +608,11 @@ export class GraphElement extends HTMLElement {
         }
       }
     }
-    paths.sort((pathA, pathB) => {
+    /**
+     * @param {Path} pathA
+     * @param {Path} pathB
+     */
+    const comparePaths = (pathA, pathB) => {
       // Prioritize paths with known name priority
       const pathANamePriority = pathA.getPathNamePriority();
       const pathBNamePriority = pathB.getPathNamePriority();
@@ -616,6 +629,12 @@ export class GraphElement extends HTMLElement {
       if (pathB.mergeCount - pathA.mergeCount !== 0) {
         return pathB.mergeCount - pathA.mergeCount;
       }
+      // Prioritize ancestor paths over descendant paths
+      const pathAAncestorCount = pathA.getAncestorCount();
+      const pathBAncestorCount = pathB.getAncestorCount();
+      if (pathAAncestorCount - pathBAncestorCount !== 0) {
+        return pathAAncestorCount - pathBAncestorCount;
+      }
       // Prioritize shorter paths, considering open paths to always be longer than closed paths.
       const pathAIsOpen = pathA.getIsOpenPath();
       const pathBIsOpen = pathB.getIsOpenPath();
@@ -627,14 +646,18 @@ export class GraphElement extends HTMLElement {
       }
       const pathALength = pathA.getExtendedEndIndex() - pathA.getExtendedStartIndex();
       const pathBLength = pathB.getExtendedEndIndex() - pathB.getExtendedStartIndex();
-      // If both paths are open, prioritize longer paths.
-      if (pathAIsOpen && pathBIsOpen) {
-        return pathBLength - pathALength;
+      if (pathBLength - pathALength !== 0) {
+        // If both paths are open, prioritize longer paths.
+        if (pathAIsOpen && pathBIsOpen) {
+          return pathBLength - pathALength;
+        }
+        else {
+          return pathALength - pathBLength;
+        }
       }
-      else {
-        return pathALength - pathBLength;
-      }
-    });
+      return 0;
+    };
+    paths.sort(comparePaths);
 
     // Select columns for paths
     const columns = [];
@@ -658,7 +681,7 @@ export class GraphElement extends HTMLElement {
             if ( ! edgeWouldOverlapNodes) {
               continue;
             }
-            const parentHasPriority = parentNode.path.columnIndex !== undefined && parentNode.path.columnIndex < column.columnIndex;
+            const parentHasPriority = comparePaths(parentNode.path, path) < 0;
             if ( ! parentHasPriority) {
               continue;
             }
