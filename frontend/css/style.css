@@ -226,10 +226,23 @@ svg-icon svg {
   box-sizing: border-box;
   overflow: hidden;
 }
-.commit .message {
+.commit .message-container {
   width: var(--message-width);
   min-width: 40ch;
   max-width: var(--message-width);
+  z-index: 1;
+}
+.commit .message {
+  display: inline-block;
+}
+.commit .message-container:hover {
+  overflow: visible;
+}
+.commit .message-container:hover .message {
+  min-width: 100%;
+  padding-right: var(--padding-width);
+  border-right: var(--border-width) solid var(--color);
+  background-color: rgb(var(--background-color) / 1);
 }
 .commit .identifier {
   font-family: monospace;
