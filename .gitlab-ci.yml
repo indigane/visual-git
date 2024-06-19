@@ -1,0 +1,10 @@
+image: busybox
+pages:
+  script:
+    - echo "Deploying GitLab Pages"  # Script is required so this is just a no-op script
+  artifacts:
+    paths:
+      - frontend
+  publish: frontend
+  # rules:
+  #   - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
