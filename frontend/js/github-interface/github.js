@@ -14,9 +14,7 @@ async function apiRequest(url) {
  * @param {string} args.repositoryName
  */
 export async function getCommitsAndRefs(args) {
-  const refs = await getRefs(args);
-  const commits = await getCommits(args);
-
+  const [refs, commits] = await Promise.all([getRefs(args), getCommits(args)]);
   return { commits, refs };
 }
 
@@ -43,38 +41,39 @@ export async function getCommits({ repositoryOwner, repositoryName }) {
   return commits;
 }
 
-export async function getRefs({ repositoryOwner, repositoryName }) {
-  // Get tags first, because the refs endpoint only returns
-  // tag object IDs for tags not the matching commit object IDs.
-  const tagsData = await apiRequest(`https://api.github.com/repos/${repositoryOwner}/${repositoryName}/tags?per_page=100`);
-  const commitIdByTagName = {};
-  for (const tagData of tagsData) {
-    commitIdByTagName[tagsData.name] = tagData.commit.sha;
-  }
-  // All refs
-  const refsData = await apiRequest(`https://api.github.com/repos/${repositoryOwner}/${repositoryName}/git/matching-refs/`);
+export async function getTags({ repositoryOwner, repositoryName }) {
   const refs = {};
+  const tagsData = await apiRequest(`https://api.github.com/repos/${repositoryOwner}/${repositoryName}/tags?per_page=100`);
+  for (const tagData of tagsData) {
+    const fullRefPath = `refs/tags/${tagData.name}`;
+    const commitId = tagData.commit.sha;
+    const refType = 'tags';
+    const refName = tagData.name;
+    refs[fullRefPath] = new Reference({ fullRefPath, commitId, refType, refName });
+  }
+  return refs;
+}
+
+export async function getBranches({ repositoryOwner, repositoryName }) {
+  const refs = {};
+  const refsData = await apiRequest(`https://api.github.com/repos/${repositoryOwner}/${repositoryName}/git/matching-refs/heads`);
   for (const refData of refsData) {
     let commitId;
     if (refData.object.type === 'commit') {
       commitId = refData.object.sha;
     }
-    else if (refData.object.type === 'tag') {
-      const tagName = refData.ref.split('refs/tags/').pop();
-      commitId = tagsData[tagName];
-      if (commitId === undefined) {
-        // TODO: Fetch tag if not already fetched?
-        continue;
-      }
-    }
     else {
-      // Something more exotic is going on, wish I could see that repository.
-      // Have to skip for now.
       continue;
     }
     const fullRefPath = refData.ref;
     const { refType, refName } = parseFullRefPath(fullRefPath);
     refs[fullRefPath] = new Reference({ fullRefPath, commitId, refType, refName });
   }
+  return refs;
+}
+
+export async function getRefs(args) {
+  const [tags, branches] = await Promise.all([getTags(args), getBranches(args)]);
+  const refs = { ...tags, ...branches };
   return refs;
 }
