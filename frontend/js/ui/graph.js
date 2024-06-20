@@ -46,7 +46,11 @@ class Path {
     const lastNode = this.nodes.slice(-1)[0];
     let endIndex = lastNode.row;
     const primaryParentNode = lastNode.parents[0];
-    if (primaryParentNode !== undefined && primaryParentNode.row > endIndex) {
+    if (primaryParentNode === undefined) {
+      // Give indeterminate edges some space for clarity
+      endIndex += 2;
+    }
+    else if (primaryParentNode.row > endIndex) {
       endIndex = primaryParentNode.row;
     }
     return endIndex;
@@ -263,6 +267,7 @@ const commitElementPool = {
  * @property {string} pathString The path string (`d`).
  * @property {number} totalLength The total length of the path.
  * @property {string} strokeColor The CSS color of the stroke.
+ * @property {boolean} isIndeterminate True if the path has no end and does not go off-screen.
  */
 
 /**
@@ -330,7 +335,11 @@ function updateCommitElement(commitElement, context, oldContext) {
     if (edge) {
       edgeElement.style.removeProperty('display');
       edgeElement.setAttribute('d', edge.pathString);
-      edgeElement.setAttribute('stroke-dasharray', edge.totalLength.toString());
+      if (edge.isIndeterminate) {
+        edgeElement.style.setProperty('--stroke-dasharray', 'var(--indeterminate-dasharray)');
+      } else {
+        edgeElement.style.setProperty('--stroke-dasharray', edge.totalLength.toString());
+      }
       // Edge needs its own color, because a node may have multiple different color edges starting from it.
       edgeElement.style.setProperty('--color', edge.strokeColor);
       if (index > 0) {
@@ -662,6 +671,7 @@ export class GraphElement extends HTMLElement {
     // Select columns for paths
     const columns = [];
     const nodelessPathColumnIndices = {};
+    const lastPathByColumnIndex = [];
     for (const [pathIndex, path] of paths.entries()) {
       const pathStart = path.getExtendedStartIndex();
       const pathEnd = path.getExtendedEndIndex();
@@ -778,6 +788,10 @@ export class GraphElement extends HTMLElement {
         selectedColumnIndex = column.columnIndex;
       }
       path.columnIndex = selectedColumnIndex;
+      const currentLastPath = lastPathByColumnIndex[path.columnIndex];
+      if (currentLastPath === undefined || path.nodes.slice(-1)[0].row > currentLastPath.nodes.slice(-1)[0].row) {
+        lastPathByColumnIndex[path.columnIndex] = path;
+      }
     }
     // Update max column
     const maxColumn = columns.length;
@@ -837,7 +851,9 @@ export class GraphElement extends HTMLElement {
           const parentNode = nodeForCommitId.get(parentId);
           const parentHasPriority = parentNode !== undefined ? parentNode.path.columnIndex < node.path.columnIndex : false;
           const edgeHasOwnColumn = parentNode === undefined ? `${node.row}-${maxRow}` in nodelessPathColumnIndices : `${node.row}-${parentNode.row}` in nodelessPathColumnIndices;
+          const isLastPathOfColumn = lastPathByColumnIndex[node.path.columnIndex] === node.path;
           const pathCommands = [];
+          let isIndeterminate = false;
           let strokeColor = colors[0];
           if (isPrimaryParent && parentNode === undefined) {
             // Parent has not been parsed yet. Draw a simple line through the bottom of the graph.
@@ -845,11 +861,12 @@ export class GraphElement extends HTMLElement {
             const startY = 0;
             pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
             const endX = node.path.columnIndex;
-            const endY = maxRow + 1 - node.row;
+            const endY = isLastPathOfColumn ? (maxRow + 1 - node.row) : 1;
             pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
             // Duplicate the end point for animations as they require a consistent number of points to transition.
             pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
             strokeColor = colors[node.path.columnIndex % colors.length];
+            isIndeterminate = ! isLastPathOfColumn;
           }
           else if (parentNode === undefined) {
             // Parent has not been parsed yet. Draw a line with a corner through the bottom of the graph.
@@ -861,11 +878,12 @@ export class GraphElement extends HTMLElement {
             const cornerY = 0;
             pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset + cornerOffset}`);
             const endX = edgeColumnIndex;
-            const endY = maxRow + 1 - node.row;
+            const endY = isLastPathOfColumn ? (maxRow + 1 - node.row) : 1;
             pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
             // Duplicate the end point for animations as they require a consistent number of points to transition.
             pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
             strokeColor = colors[edgeColumnIndex % colors.length];
+            isIndeterminate = ! isLastPathOfColumn;
           }
           else if (node.path === parentNode.path) {
             // Edge is within the same path. Draw a simple line.
@@ -928,6 +946,7 @@ export class GraphElement extends HTMLElement {
             pathString,
             totalLength: calculatePathStringLength(pathString),
             strokeColor,
+            isIndeterminate,
           };
           edges.push(edgeContext);
         }

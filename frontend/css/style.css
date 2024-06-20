@@ -185,10 +185,20 @@ svg-icon svg {
 }
 .commit .graph .edge {
   --stroke-width: calc(var(--graph-thickness-base) / 16);
+  --stroke-dashoffset: calc(-1 * var(--graph-thickness-base) / 6.4);
+  --indeterminate-dasharray:
+    calc(var(--row-height) / 4)
+    calc(var(--row-height) / 20)
+    calc(var(--row-height) / 8)
+    calc(var(--row-height) / 20)
+    calc(var(--row-height) / 16)
+    var(--row-height)
+  ;
   stroke: var(--color, currentColor);
   stroke-width: var(--stroke-width);
   fill: transparent;
-  stroke-dashoffset: calc(-1 * var(--graph-thickness-base) / 6.4);
+  stroke-dashoffset: var(--stroke-dashoffset);
+  stroke-dasharray: var(--stroke-dasharray, 0);
   transition-property: d, stroke, stroke-width, stroke-dasharray;
   transition-duration: var(--transition-duration, 0);
   transition-timing-function: ease-in-out;
