@@ -40,21 +40,22 @@ const isValidPath = (() => {
 const server = http.createServer((req, res) => {
   // Serve static files
   if (req.method === 'GET') {
-    const filePath = req.url === '/' ? 'index.html' : req.url;
-    if ( ! isValidPath(filePath)) {
-      res.statusCode = 404;
-      res.end();
+    const respondWithStaticFile = (filePath) => {
+      const mimeType = extensionToMimeType[path.extname(filePath)] ?? 'application/octet-stream';
+      fs.readFile(path.join(STATIC_PATH, filePath), (err, data) => {
+        if (err) {
+          respondWithStaticFile('index.html');
+        } else {
+          res.writeHead(200, {'Content-Type': mimeType});
+          res.end(data);
+        }
+      });
+    };
+    let filePath = req.url;
+    if (filePath === '/' || ! isValidPath(filePath)) {
+      filePath = 'index.html';
     }
-    const mimeType = extensionToMimeType[path.extname(filePath)] ?? 'application/octet-stream';
-    fs.readFile(path.join(STATIC_PATH, filePath), (err, data) => {
-      if (err) {
-        res.statusCode = 404;
-        res.end();
-      } else {
-        res.writeHead(200, {'Content-Type': mimeType});
-        res.end(data);
-      }
-    });
+    respondWithStaticFile(filePath);
   } else if (req.method === 'POST' && req.url === '/') {
     // Handle commands
     let body = '';

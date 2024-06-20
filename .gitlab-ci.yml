@@ -1,7 +1,10 @@
 image: busybox
 pages:
   script:
-    - echo "Deploying GitLab Pages"  # Script is required so this is just a no-op script
+    # Redirect all non-matching paths to index.html
+    - echo "/* /index.html 200" > frontend/_redirects
+    # Set correct base path so that you can just append a repo URL to visual-git URL
+    - sed -i 's|<base href="/"|<base href="/visual-git/"|' frontend/index.html
   artifacts:
     paths:
       - frontend
