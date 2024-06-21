@@ -576,14 +576,6 @@ export class GraphElement extends HTMLElement {
           if (parentNode !== undefined) {
             childNode.parents[parentIndex] = parentNode;
           }
-          else {
-            childNode.parents[parentIndex] = new Node({
-              commit: new Commit({id: parentId}),
-              path: null,
-              row: maxRow,
-              isPlaceholder: true,
-            });
-          }
         }
       }
       // Add path name candidates from refs
@@ -602,6 +594,25 @@ export class GraphElement extends HTMLElement {
         const secondaryParentCommitId = commit.parents[1];
         const secondaryParentPath = getOrCreatePathForCommitId(secondaryParentCommitId);
         secondaryParentPath.nameCandidatesFromCommitSubjectLines.push(mergeSourceBranchName);
+      }
+    }
+
+    // Add placeholder parent nodes where needed
+    for (const commit of commits) {
+      const node = nodeForCommitId.get(commit.id);
+      if (node.parents.length === commit.parents.length) {
+        continue;
+      }
+      for (const [parentIndex, parentId] of commit.parents.entries()) {
+        if (node.parents[parentIndex] !== undefined) {
+          continue;
+        }
+        node.parents[parentIndex] = new Node({
+          commit: new Commit({id: parentId}),
+          path: null,
+          row: maxRow,
+          isPlaceholder: true,
+        });
       }
     }
 
@@ -712,9 +723,6 @@ export class GraphElement extends HTMLElement {
           const secondaryParents = node.parents.slice(1);
           const parentsWithoutPath = secondaryParents.filter(node => node.path === null);
           for (const parentNode of parentsWithoutPath) {
-            if (parentNode.path !== null) {
-              continue;
-            }
             const range = {start: node.row, end: parentNode.row};
             let nextColumn = getNextColumn(columnIterator);
             while (getIsOverlappingOccupiedRange(nextColumn, range.start, range.end)) {
