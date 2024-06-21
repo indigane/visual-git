@@ -49,13 +49,21 @@ function setUpGithub() {
   /** @type {SettingsElement} */ const settings = document.querySelector('vg-settings');
   /** @type {GraphElement} */ const graph = document.querySelector('vg-graph');
 
+  // TODO: Remove this when settings are implemented properly
+  /** @type {HTMLElement} */ const currentBranchInput = settings.querySelector('[name="commitVisibility"][value="currentBranch"]');
+  currentBranchInput.click();
+
   getCommitsAndRender();
   settings.addEventListener('setting-change', getCommitsAndRender);
 
   async function getCommitsAndRender() {
     const maxCommits = settings.get('maxCommits');
     const commitVisibility = settings.get('commitVisibility');
-    const { commits, refs } = await github.getCommitsAndRefs({ repositoryOwner, repositoryName });
+    const options = {
+      maxCommits,
+      commitVisibility,
+    };
+    const { commits, refs } = await github.getCommitsAndRefs({ repositoryOwner, repositoryName, options });
     graph.renderCommits({
       commits: commits.slice(0, maxCommits),
       refs,
