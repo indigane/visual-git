@@ -24,11 +24,14 @@ class Path {
   getId() {
     return this.nodes[0].commit.id;
   }
+  getLastNode() {
+    return this.nodes.slice(-1)[0];
+  }
   getStartIndex() {
     return this.nodes[0].row;
   }
   getEndIndex() {
-    return this.nodes.slice(-1)[0].row;
+    return this.getLastNode().row;
   }
   /** Get the start index of the path, including the connecting node of the parent path(s) if any */
   getExtendedStartIndex() {
@@ -43,7 +46,7 @@ class Path {
   }
   /** Get the end index of the path, including the connecting node of the parent path(s) if any */
   getExtendedEndIndex() {
-    const lastNode = this.nodes.slice(-1)[0];
+    const lastNode = this.getLastNode();
     let endIndex = lastNode.row;
     const primaryParentNode = lastNode.parents[0];
     if (primaryParentNode === undefined) {
@@ -61,14 +64,14 @@ class Path {
     if (firstNode.children.length === 0) {
       return true;
     }
-    const lastNode = this.nodes.slice(-1)[0];
+    const lastNode = this.getLastNode();
     if (lastNode.parents.length === 0) {
       return true;
     }
     return false;
   }
   getPrimaryParentPath() {
-    const lastNode = this.nodes.slice(-1)[0];
+    const lastNode = this.getLastNode();
     return lastNode.parents[0]?.path;
   }
   getAncestorCount() {
@@ -713,12 +716,16 @@ export class GraphElement extends HTMLElement {
             if ( ! parentHasPriority) {
               continue;
             }
+            if (parentNode.isPlaceholder) {
+              continue;
+            }
             const range = {start: node.row, end: parentNode.row};
             while (getIsOverlappingOccupiedRange(column, range.start, range.end)) {
               column = getNextColumn(columnIterator);
             }
             column.occupiedRanges.push(range);
-            nodelessPathColumnIndices[`${node.row}-${parentNode.row}`] = column.columnIndex;
+            const parentIndex = node.parents.indexOf(parentNode);
+            nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = column.columnIndex;
             while ( ! getIsColumnValidForPath(column, pathStart, pathEnd)) {
               column = getNextColumn(columnIterator);
             }
@@ -730,12 +737,17 @@ export class GraphElement extends HTMLElement {
           const secondaryParents = node.parents.slice(1);
           const parentsWithoutPath = secondaryParents.filter(node => node.path === null);
           for (const parentNode of parentsWithoutPath) {
+            const parentIndex = node.parents.indexOf(parentNode);
+            if (parentNode.isPlaceholder && node !== node.path.getLastNode()) {
+              nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = column.columnIndex + parentIndex;
+              continue;
+            }
             const range = {start: node.row, end: parentNode.row};
             let nextColumn = getNextColumn(columnIterator);
             while (getIsOverlappingOccupiedRange(nextColumn, range.start, range.end)) {
               nextColumn = getNextColumn(columnIterator);
             }
-            nodelessPathColumnIndices[`${node.row}-${parentNode.row}`] = nextColumn.columnIndex;
+            nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = nextColumn.columnIndex;
             nextColumn.occupiedRanges.push(range);
           }
         }
@@ -804,7 +816,7 @@ export class GraphElement extends HTMLElement {
       }
       path.columnIndex = selectedColumnIndex;
       const currentLastPath = lastPathByColumnIndex[path.columnIndex];
-      if (currentLastPath === undefined || path.nodes.slice(-1)[0].row > currentLastPath.nodes.slice(-1)[0].row) {
+      if (currentLastPath === undefined || path.getLastNode().row > currentLastPath.getLastNode().row) {
         lastPathByColumnIndex[path.columnIndex] = path;
       }
     }
@@ -865,27 +877,29 @@ export class GraphElement extends HTMLElement {
           const isPrimaryParent = parentIndex === 0;
           const parentNode = nodeForCommitId.get(parentId);
           const parentHasPriority = parentNode !== undefined ? parentNode.path.columnIndex < node.path.columnIndex : false;
-          const edgeHasOwnColumn = parentNode === undefined ? `${node.row}-${maxRow}` in nodelessPathColumnIndices : `${node.row}-${parentNode.row}` in nodelessPathColumnIndices;
+          const edgeColumnIndex = nodelessPathColumnIndices[`${node.row}-${parentIndex}`];
+          const edgeHasOwnColumn = edgeColumnIndex !== undefined;
           const isLastPathOfColumn = lastPathByColumnIndex[node.path.columnIndex] === node.path;
+          const isLastNode = node === node.path.getLastNode();
           const pathCommands = [];
           let isIndeterminate = false;
           let strokeColor = colors[0];
           if (isPrimaryParent && parentNode === undefined) {
             // Parent has not been parsed yet. Draw a simple line through the bottom of the graph.
+            isIndeterminate = ! isLastPathOfColumn || ! isLastNode;
             const startX = node.path.columnIndex;
             const startY = 0;
             pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
             const endX = node.path.columnIndex;
-            const endY = isLastPathOfColumn ? (maxRow + 1 - node.row) : 1;
+            const endY = isIndeterminate ? 1 : (maxRow + 1 - node.row);
             pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
             // Duplicate the end point for animations as they require a consistent number of points to transition.
             pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
             strokeColor = colors[node.path.columnIndex % colors.length];
-            isIndeterminate = ! isLastPathOfColumn;
           }
           else if (parentNode === undefined) {
             // Parent has not been parsed yet. Draw a line with a corner through the bottom of the graph.
-            const edgeColumnIndex = nodelessPathColumnIndices[`${node.row}-${maxRow}`];
+            isIndeterminate = ! isLastPathOfColumn || ! isLastNode;
             const startX = node.path.columnIndex;
             const startY = 0;
             pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
@@ -893,12 +907,11 @@ export class GraphElement extends HTMLElement {
             const cornerY = 0;
             pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset + cornerOffset}`);
             const endX = edgeColumnIndex;
-            const endY = isLastPathOfColumn ? (maxRow + 1 - node.row) : 1;
+            const endY = isIndeterminate ? 1 : (maxRow + 1 - node.row);
             pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
             // Duplicate the end point for animations as they require a consistent number of points to transition.
             pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
             strokeColor = colors[edgeColumnIndex % colors.length];
-            isIndeterminate = ! isLastPathOfColumn;
           }
           else if (node.path === parentNode.path) {
             // Edge is within the same path. Draw a simple line.
@@ -928,7 +941,6 @@ export class GraphElement extends HTMLElement {
           else if (parentHasPriority && edgeHasOwnColumn) {
             // Edge is diverging from top right to bottom left. Draw a line with a corner.
             // From a high priority path to a low priority path. For example merge main to develop.
-            const edgeColumnIndex = nodelessPathColumnIndices[`${node.row}-${parentNode.row}`];
             const startX = node.path.columnIndex;
             const startY = 0;
             pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);

@@ -192,7 +192,7 @@ svg-icon svg {
     calc(var(--row-height) / 8)
     calc(var(--row-height) / 20)
     calc(var(--row-height) / 16)
-    var(--row-height)
+    200vmax
   ;
   stroke: var(--color, currentColor);
   stroke-width: var(--stroke-width);
