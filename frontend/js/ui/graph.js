@@ -11,6 +11,10 @@ import { parseBranchNamesFromSubject } from '../git-interface/parsers.js';
 import { asTextContent, requestIdlePromise, splitOnce } from '../utils.js';
 
 
+// TOOD: This should be a setting
+const shouldHideIndeterminateMergeEdges = true;
+
+
 class Path {
   constructor({nodes}) {
     /** @type {Node[]} */
@@ -693,11 +697,12 @@ export class GraphElement extends HTMLElement {
     const columns = [];
     const nodelessPathColumnIndices = {};
     const lastPathByColumnIndex = [];
-    for (const [pathIndex, path] of paths.entries()) {
+    for (const path of paths) {
       const pathStart = path.getExtendedStartIndex();
       const pathEnd = path.getExtendedEndIndex();
       const minColumnIndex = path.getPrimaryParentPath()?.columnIndex ?? 0;
       let selectedColumnIndex = undefined;
+      let indeterminateMergeEdgeCounter = 0;
       const columnIterator = columns.values();
 
       const assignColumnsForHighToLowMergeEdges = function(column) {
@@ -716,7 +721,7 @@ export class GraphElement extends HTMLElement {
             if ( ! parentHasPriority) {
               continue;
             }
-            if (parentNode.isPlaceholder) {
+            if (parentNode.isPlaceholder && shouldHideIndeterminateMergeEdges) {
               continue;
             }
             const range = {start: node.row, end: parentNode.row};
@@ -738,8 +743,9 @@ export class GraphElement extends HTMLElement {
           const parentsWithoutPath = secondaryParents.filter(node => node.path === null);
           for (const parentNode of parentsWithoutPath) {
             const parentIndex = node.parents.indexOf(parentNode);
-            if (parentNode.isPlaceholder && node !== node.path.getLastNode()) {
-              nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = column.columnIndex + parentIndex;
+            if (parentNode.isPlaceholder && node !== node.path.getLastNode() && shouldHideIndeterminateMergeEdges) {
+              indeterminateMergeEdgeCounter += 1;
+              nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = column.columnIndex + indeterminateMergeEdgeCounter + 1;
               continue;
             }
             const range = {start: node.row, end: parentNode.row};
@@ -881,12 +887,13 @@ export class GraphElement extends HTMLElement {
           const edgeHasOwnColumn = edgeColumnIndex !== undefined;
           const isLastPathOfColumn = lastPathByColumnIndex[node.path.columnIndex] === node.path;
           const isLastNode = node === node.path.getLastNode();
+          const isLastNodeOfLastPathOfColumn = isLastPathOfColumn && isLastNode;
           const pathCommands = [];
           let isIndeterminate = false;
           let strokeColor = colors[0];
           if (isPrimaryParent && parentNode === undefined) {
             // Parent has not been parsed yet. Draw a simple line through the bottom of the graph.
-            isIndeterminate = ! isLastPathOfColumn || ! isLastNode;
+            isIndeterminate = ! isLastNodeOfLastPathOfColumn;
             const startX = node.path.columnIndex;
             const startY = 0;
             pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
@@ -899,7 +906,7 @@ export class GraphElement extends HTMLElement {
           }
           else if (parentNode === undefined) {
             // Parent has not been parsed yet. Draw a line with a corner through the bottom of the graph.
-            isIndeterminate = ! isLastPathOfColumn || ! isLastNode;
+            isIndeterminate = ! isLastNodeOfLastPathOfColumn && shouldHideIndeterminateMergeEdges;
             const startX = node.path.columnIndex;
             const startY = 0;
             pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);

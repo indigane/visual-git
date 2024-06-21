@@ -187,11 +187,11 @@ svg-icon svg {
   --stroke-width: calc(var(--graph-thickness-base) / 16);
   --stroke-dashoffset: calc(-1 * var(--graph-thickness-base) / 6.4);
   --indeterminate-dasharray:
-    calc(var(--row-height) / 4)
+    calc(var(--row-height) / 10)
     calc(var(--row-height) / 20)
-    calc(var(--row-height) / 8)
     calc(var(--row-height) / 20)
-    calc(var(--row-height) / 16)
+    calc(var(--row-height) / 20)
+    calc(var(--row-height) / 20)
     200vmax
   ;
   stroke: var(--color, currentColor);
