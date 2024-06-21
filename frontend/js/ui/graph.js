@@ -330,6 +330,13 @@ function updateCommitElement(commitElement, context, oldContext) {
   commitElement.style.setProperty('--color', context.color);
   commitElement.style.setProperty('--max-column', context.maxColumn.toString());
   commitElement.setAttribute('data-commit-id', context.commit.id);
+  if (parseFloat(context.transitionDuration) !== 0) {
+    const removeTransitionDuration = function() {
+      commitElement.style.setProperty('--transition-duration', '0s');
+      commitElement.removeEventListener('transitionend', removeTransitionDuration);
+    };
+    commitElement.addEventListener('transitionend', removeTransitionDuration);
+  }
   for (const [index, edgeElement] of commitElement._elems.edges.entries()) {
     const edge = context.edges[index];
     if (edge) {
