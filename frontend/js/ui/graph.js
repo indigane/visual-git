@@ -236,6 +236,15 @@ const commitElementPool = {
     commitElement.style.display = 'none';
     commitElement._boundCommitId = undefined;
   },
+  removeOutOfRangeElements: function () {
+    const { viewportMinRowIndex, viewportMaxRowIndex } = getViewportMinMaxRows();
+    for (const commitElement of this.pool) {
+      const isWithinViewport = isCommitInRange(commitElement._context, viewportMinRowIndex, viewportMaxRowIndex);
+      if ( ! isWithinViewport) {
+        this.remove(commitElement);
+      }
+    }
+  },
   get: function (commitId) {
     const commitContext = commitContextByCommitId[commitId];
     if (this.elementsByCommitId[commitId] !== undefined) {
@@ -389,7 +398,7 @@ function getViewportMinMaxRows() {
   const columnWidth = 24;
   const rowHeight = 32;
   const topOffset = 5;
-  const bottomOffset = 5;
+  const bottomOffset = Math.ceil(window.innerHeight / rowHeight);
   const viewportMinRowIndex = Math.floor(document.documentElement.scrollTop / rowHeight) - topOffset;
   const viewportMaxRowIndex = Math.ceil((document.documentElement.scrollTop + window.innerHeight) / rowHeight) + bottomOffset;
   return { viewportMinRowIndex, viewportMaxRowIndex };
@@ -1097,6 +1106,7 @@ export class GraphElement extends HTMLElement {
         delete commitContextByCommitId[commitId];
       }
     }
+    commitElementPool.removeOutOfRangeElements();
     // For now all animations are deferred until the end of graph construction.
     // An optimization is possible:
     // - Move knownCommitIdsForEnterLeaveAnimation to the first-pass for loop.
