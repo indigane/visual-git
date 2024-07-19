@@ -1,5 +1,5 @@
 import * as git from './git-interface/commands.js';
-import * as github from './github-interface/github.js';
+import { GithubProvider } from './github-interface/github.js';
 import { SettingsElement } from './ui/settings.js';
 import { GraphElement } from './ui/graph.js';
 import { debounce } from './utils.js';
@@ -16,11 +16,11 @@ function setUpLocal() {
   socket.addEventListener('message', debounce(getCommitsAndRender, 50));
 
   async function getCommitsAndRender() {
-    const maxCommits = settings.get('maxCommits');
+    const commitPageSize = settings.get('local__commitPageSize');
     const commitVisibility = settings.get('commitVisibility');
     const flags = [
       '--date-order',
-      `--max-count=${maxCommits}`,
+      `--max-count=${commitPageSize}`,
     ];
     if (commitVisibility === 'allRefs') {
       // NOTE: --exclude=*dependabot*
@@ -32,7 +32,7 @@ function setUpLocal() {
     // const commits = await git.logCustom(...flags);
     const { commits, refs } = await git.logRaw(...flags);
     graph.renderCommits({
-      commits: commits.slice(0, maxCommits),
+      commits: commits.slice(0, commitPageSize),
       refs,
     });
   }
@@ -57,15 +57,16 @@ function setUpGithub() {
   settings.addEventListener('setting-change', getCommitsAndRender);
 
   async function getCommitsAndRender() {
-    const maxCommits = settings.get('maxCommits');
+    const commitPageSize = settings.get('github__commitPageSize');
     const commitVisibility = settings.get('commitVisibility');
     const options = {
-      maxCommits,
+      commitPageSize,
       commitVisibility,
     };
-    const { commits, refs } = await github.getCommitsAndRefs({ repositoryOwner, repositoryName, options });
+    const github = new GithubProvider({ repositoryOwner, repositoryName, options });
+    const { commits, refs } = await github.getWithNext();
     graph.renderCommits({
-      commits: commits.slice(0, maxCommits),
+      commits: commits,
       refs,
     });
   }

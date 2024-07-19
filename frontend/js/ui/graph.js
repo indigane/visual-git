@@ -388,7 +388,7 @@ function updateCommitElement(commitElement, context, oldContext) {
   if (oldContext?.commit.id !== context.commit.id) {
     commitElement._elems.identifier.textContent = context.commit.id.substring(0, 8);
     commitElement._elems.author.textContent = context.commit.authorName;
-    commitElement._elems.timestamp.textContent = context.commit.authorDate.toISOString().replace('T', ' ').split('.')[0];
+    commitElement._elems.timestamp.textContent = context.commit.committerDate.toISOString().replace('T', ' ').split('.')[0];
   }
   commitElement._elems.refsContainer.replaceChildren();
 }
