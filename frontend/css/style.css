@@ -275,3 +275,8 @@ svg-icon svg {
   min-width: var(--timestamp-width);
   max-width: var(--timestamp-width);
 }
+
+/* vg-apiauth */
+vg-apiauth {
+  display: flex;
+}

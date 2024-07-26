@@ -3,6 +3,7 @@ import * as github from './github-interface/github.js';
 import { SettingsElement } from './ui/settings.js';
 import { GraphElement } from './ui/graph.js';
 import { debounce } from './utils.js';
+import { APIAuthElement } from './ui/api-auth.js';
 
 function setUpLocal() {
   /** @type {SettingsElement} */ const settings = document.querySelector('vg-settings');
@@ -48,6 +49,11 @@ function setUpGithub() {
 
   /** @type {SettingsElement} */ const settings = document.querySelector('vg-settings');
   /** @type {GraphElement} */ const graph = document.querySelector('vg-graph');
+  const apiauthElement = new APIAuthElement({
+    authenticate: github.authenticate,
+    unauthenticate: github.unauthenticate,
+    readMoreUrl: 'https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api',
+  });
 
   // TODO: Remove this when settings are implemented properly
   /** @type {HTMLElement} */ const currentBranchInput = settings.querySelector('[name="commitVisibility"][value="currentBranch"]');
