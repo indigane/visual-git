@@ -1,11 +1,41 @@
 import { parseFullRefPath } from '../git-interface/parsers.js';
 import Commit from '../models/commit.js';
 import Reference from '../models/reference.js';
-import { splitOnce } from '../utils.js';
+import { documentEvent, splitOnce } from '../utils.js';
+
+
+let highestRateLimitUsed = 0;
+let latestRateLimitResetAt = 0;
+
+
+function handleRateLimit(response) {
+  let ratelimitLimit;
+  let ratelimitUsed;
+  let ratelimitResetAt;
+  try {
+    ratelimitLimit = parseInt(response.headers.get('x-ratelimit-limit'));
+    ratelimitUsed = parseInt(response.headers.get('x-ratelimit-used'));
+    ratelimitResetAt = parseInt(response.headers.get('x-ratelimit-reset'));
+  } catch (err) {
+    console.error(err);
+    return;
+  }
+  const isSameRateLimit = latestRateLimitResetAt === ratelimitResetAt;
+  const isDecrease = ratelimitUsed <= highestRateLimitUsed;
+  const shouldSkip = isSameRateLimit && isDecrease;
+  if (shouldSkip) {
+    return;
+  }
+  documentEvent('rate-limit-updated', /** @type {RateLimitEventDetail} */({
+    totalCount: ratelimitLimit,
+    usedCount: ratelimitUsed,
+  }));
+}
 
 
 async function apiRequest(url) {
   const response = await fetch(url);
+  handleRateLimit(response);
   return await response.json();
 }
 

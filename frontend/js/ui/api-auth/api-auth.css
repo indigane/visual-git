@@ -1,0 +1,10 @@
+vg-apiauth {
+  display: flex;
+
+  .authenticate-button {
+    
+  }
+  .unauthenticate-button {
+    display: none;
+  }
+}
