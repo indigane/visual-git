@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base href="/" />
+    <title>Visual Git &ndash; Tests</title>
+    <link href="css/style.css" rel="stylesheet">
+  </head>
+  <body>
+    <pre>Test results in console</pre>
+    <script type="module">
+      const testPaths = [
+        './tests/graph-tests.js',
+      ];
+      for (const testPath of testPaths) {
+        const tests = (await import(testPath)).default;
+        for (const testFunction of tests) {
+          try {
+            testFunction();
+            console.info(`%cTest passed: ${testPath}::${testFunction.name}`, 'color: #0f0;');
+          } catch (error) {
+            console.error(`Test failed: ${testPath}::${testFunction.name}\n\n`, error);
+          }
+        }
+      }
+    </script>
+  </body>
+</html>
