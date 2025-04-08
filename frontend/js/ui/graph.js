@@ -3,190 +3,27 @@ import {
   animateCommitLeave,
   animateRefEnter,
   animateRefTransition,
-  calculatePathStringLength,
 } from './animations.js';
 import Commit from '../models/commit.js';
 import Reference from '../models/reference.js';
-import { parseBranchNamesFromSubject } from '../git-interface/parsers.js';
-import { asTextContent, requestIdlePromise, splitOnce } from '../utils.js';
+import {
+  addPlaceholderParents,
+  assignPathColumns,
+  collectPaths,
+  getEdges,
+  getRefMappings,
+  compareRefs,
+  renderRef,
+  sortPaths,
+} from './graph-functions.js';
+import { requestIdlePromise } from '../utils.js';
+/** @typedef {import('graph-models.js').CommitContext} CommitContext */
+/** @typedef {import('graph-models.js').EdgeContext} EdgeContext */
+/** @typedef {import('graph-models.js').ReferenceContext} ReferenceContext */
 
 
 // TOOD: This should be a setting
 const shouldHideIndeterminateMergeEdges = true;
-
-
-class Path {
-  constructor({nodes}) {
-    /** @type {Node[]} */
-    this.nodes = nodes;
-    this.columnIndex = undefined;
-    this.mergeCount = 0;
-    this.priorityForNodes = 0;
-    this.nameCandidatesFromRefs = [];
-    this.nameCandidatesFromCommitSubjectLines = [];
-  }
-  getId() {
-    return this.nodes[0].commit.id;
-  }
-  getLastNode() {
-    return this.nodes.slice(-1)[0];
-  }
-  getStartIndex() {
-    return this.nodes[0].row;
-  }
-  getEndIndex() {
-    return this.getLastNode().row;
-  }
-  /** Get the start index of the path, including the connecting node of the parent path(s) if any */
-  getExtendedStartIndex() {
-    const firstNode = this.nodes[0];
-    let startIndex = firstNode.row;
-    for (const childNode of firstNode.children) {
-      if (childNode.row < startIndex) {
-        startIndex = childNode.row;
-      }
-    }
-    return startIndex;
-  }
-  /** Get the end index of the path, including the connecting node of the parent path(s) if any */
-  getExtendedEndIndex() {
-    const lastNode = this.getLastNode();
-    let endIndex = lastNode.row;
-    const primaryParentNode = lastNode.parents[0];
-    if (primaryParentNode === undefined) {
-      // Give indeterminate edges some space for clarity
-      endIndex += 2;
-    }
-    else if (primaryParentNode.row > endIndex) {
-      endIndex = primaryParentNode.row;
-    }
-    return endIndex;
-  }
-  /** Return true if the path start or end is not connected to any other path */
-  getIsOpenPath() {
-    const firstNode = this.nodes[0];
-    if (firstNode.children.length === 0) {
-      return true;
-    }
-    const lastNode = this.getLastNode();
-    if (lastNode.parents.length === 0) {
-      return true;
-    }
-    return false;
-  }
-  getPrimaryParentPath() {
-    const lastNode = this.getLastNode();
-    return lastNode.parents[0]?.path;
-  }
-  getAncestorCount() {
-    let ancestorPath = this.getPrimaryParentPath();
-    let ancestorCount = 0;
-    while(ancestorPath) {
-      ancestorCount += 1;
-      ancestorPath = ancestorPath.getPrimaryParentPath();
-    }
-    return ancestorCount;
-  }
-  _getInferredName() {
-    const namePriorities = [
-      /^(.+\/)?(master|main|trunk|default)$/i,
-      /^(.+\/)?(hotfix\/.+)$/i,
-      /^(.+\/)?(develop|development)$/i,
-    ];
-    for (const namePriorityRegex of namePriorities) {
-      for (const nameCandidate of this.nameCandidatesFromRefs) {
-        if (namePriorityRegex.test(nameCandidate)) {
-          return nameCandidate;
-        }
-      }
-      for (const nameCandidate of this.nameCandidatesFromCommitSubjectLines) {
-        if (namePriorityRegex.test(nameCandidate)) {
-          return nameCandidate;
-        }
-      }
-    }
-    if (this.nameCandidatesFromRefs.length > 0) {
-      return this.nameCandidatesFromRefs[0];
-    }
-    if (this.nameCandidatesFromCommitSubjectLines.length > 0) {
-      return this.nameCandidatesFromCommitSubjectLines[0];
-    }
-    return undefined;
-  }
-  getInferredName() {
-    if (this._inferredName !== undefined) {
-      return this._inferredName;
-    }
-    this._inferredName = this._getInferredName();
-    return this._inferredName;
-  }
-  _getPathNamePriority(pathName) {
-    const namePriorities = [
-      /^(.+\/)?(master|main|trunk|default)$/i,
-      /^(.+\/)?(hotfix\/.+)$/i,
-      /^(.+\/)?(develop|development)$/i,
-    ];
-    if (pathName === undefined) {
-      pathName = this.getInferredName();
-    }
-    let priorityIndex;
-    for (priorityIndex = 0; priorityIndex < namePriorities.length; priorityIndex++) {
-      const namePriorityRegex = namePriorities[priorityIndex];
-      if (namePriorityRegex?.test(pathName)) {
-        break;
-      }
-    }
-    const priority = namePriorities.length - priorityIndex;
-    if (priority === 0) {
-      return this.getPrimaryParentPath()?.getPathNamePriority() ?? priority;
-    }
-    return priority;
-  }
-  getPathNamePriority() {
-    if (this._namePriority !== undefined) {
-      return this._namePriority;
-    }
-    this._namePriority = this._getPathNamePriority();
-    return this._namePriority;
-  }
-  getMergeCountPriority() {
-    if (this.mergeCount === 0) {
-      return this.getPrimaryParentPath()?.getMergeCountPriority() ?? this.mergeCount;
-    }
-    return this.mergeCount;
-  }
-  compareForNodeInsertion(pathB) {
-    const pathA = this;
-    if (pathA.priorityForNodes === pathB.priorityForNodes) {
-      return pathB.getStartIndex() - pathA.getStartIndex();
-    }
-    return pathA.priorityForNodes - pathB.priorityForNodes;
-  }
-}
-
-
-class Node {
-  /** @type {Commit} */ commit;
-  /** @type {Path} */ path;
-  /** @type {Node[]} */ children;
-  /** @type {Node[]} */ parents;
-  constructor({commit, path, row, isPlaceholder = false}) {
-    this.commit = commit;
-    this.path = path;
-    this.row = row;
-    this.children = [];
-    this.parents = [];
-    this.isPlaceholder = isPlaceholder;
-  }
-  getPreviousNodeInPath() {
-    const thisIndex = this.path.nodes.indexOf(this);
-    return this.path.nodes[thisIndex - 1] ?? null;
-  }
-  getNextNodeInPath() {
-    const thisIndex = this.path.nodes.indexOf(this);
-    return this.path.nodes[thisIndex + 1] ?? null;
-  }
-}
 
 
 /** @type {Object.<string, CommitContext>} */ const commitContextByCommitId = {};
@@ -262,37 +99,6 @@ const commitElementPool = {
   },
 };
 
-/**
- * Context data for rendering a CommitElement.
- * @typedef {Object} CommitContext
- * @property {Commit} commit The commit object.
- * @property {number} row The row index.
- * @property {number} column The column index.
- * @property {string} color The CSS color of the node and edges.
- * @property {string[]} childCommitIds The IDs of the child commits.
- * @property {number[]} parentCommitRows The row indices of the parent commits.
- * @property {EdgeContext[]} edges The context for the edges.
- * @property {number} maxColumn The maximum column index.
- * @property {Reference[]} refs The references pointing to this commit.
- * @property {string} [transitionDuration] The duration of transition animation as CSS duration string.
- */
-
-/**
- * Context data for rendering an edge of a CommitElement.
- * @typedef {Object} EdgeContext
- * @property {string} pathString The path string (`d`).
- * @property {number} totalLength The total length of the path.
- * @property {string} strokeColor The CSS color of the stroke.
- * @property {boolean} isIndeterminate True if the path has no end and does not go off-screen.
- */
-
-/**
- * Context data for rendering a Reference.
- * @typedef {Object} ReferenceContext
- * @property {Reference} ref - The reference object.
- * @property {string} htmlString - The HTML string representation of the reference.
- * @property {string} [previousCommitId] - The commit ID of a previous ref, if available.
- */
 
 /**
  * @typedef {HTMLElement & {
@@ -496,345 +302,26 @@ export class GraphElement extends HTMLElement {
     commitsContainer.style.setProperty('--graph-thickness-base', graphThicknessBase + 'px');
     commitsContainer.style.setProperty('--max-row', maxRow.toString());
 
-    // Reverse mapping for refs
-    /** @type {Object.<string, Reference[]>} */ const refsByCommitId = {};
-    /** @type {Object.<string, number>} */ const pathRefPriorityForCommitId = {};
-    const namePriorities = [
-      /^(.+\/)?(master)$/i,
-      /^(.+\/)?(main)$/i,
-      /^(.+\/)?(trunk)$/i,
-      /^(.+\/)?(default)$/i,
-      /^(.+\/)?(develop)$/i,
-      /^(.+\/)?(development)$/i,
-    ];
-    for (const ref of Object.values(refs)) {
-      if (refsByCommitId[ref.commitId] === undefined) {
-        refsByCommitId[ref.commitId] = [];
-      }
-      refsByCommitId[ref.commitId].push(ref);
-      for (const [index, namePriorityRegex] of [...namePriorities.entries()]) {
-        if (namePriorityRegex?.test(ref.refName)) {
-          pathRefPriorityForCommitId[ref.commitId] = namePriorities.length - index;
-          // These are used to split paths. To avoid splitting for example
-          // main multiple times, remove it after the first occurrence.
-          namePriorities[index] = undefined;
-        }
-      }
-    }
+    const {
+      refsByCommitId,
+      pathRefPriorityForCommitId,
+    } = getRefMappings(refs);
 
-    // Collect paths of nodes
-    /** @type {Path[]} */ let paths = [];
-    /** @type {Map<string, Path>} */ const pathForCommitId = new Map();
-    /** @type {Map<string, Node>} */ const nodeForCommitId = new Map();
-    /** @type {Map<string, string[]>} */ const childIdsForCommitId = new Map();
-    function createPath(commitId) {
-      const path = new Path({
-        nodes: [],
-      });
-      paths.push(path);
-      pathForCommitId.set(commitId, path);
-      return path;
-    }
-    function getOrCreatePathForCommitId(commitId) {
-      const path = pathForCommitId.get(commitId);
-      if (path !== undefined) {
-        return path;
-      }
-      return createPath(commitId);
-    }
-    for (const [index, commit] of commits.entries()) {
-      // Non-blocking iteration
-      const batchSize = 1000;
-      const maxWaitMs = 100;
-      const isBatchSizeReached = index !== 0 && index % batchSize === 0;
-      if (isBatchSizeReached) {
-        await requestIdlePromise(maxWaitMs);
-      }
-      // Place node on a path
-      let path;
-      const pathRefPriority = pathRefPriorityForCommitId[commit.id];
-      const shouldCreateNewPath = pathRefPriority !== undefined;
-      if (shouldCreateNewPath) {
-        path = createPath(commit.id);
-        path.priorityForNodes = pathRefPriority;
-      } else {
-        path = getOrCreatePathForCommitId(commit.id);
-      }
-      const node = new Node({
-        commit,
-        path,
-        row: index,
-      });
-      path.nodes.push(node);
-      nodeForCommitId.set(commit.id, node);
-      // Tentatively place primary parent on the same path, based on path precedence
-      const primaryParentId = commit.parents[0];
-      const existingPath = pathForCommitId.get(primaryParentId);
-      if (primaryParentId === undefined) {
-        // No parents, do nothing.
-      }
-      else if (existingPath !== undefined && existingPath.nodes.length > 0 && path.compareForNodeInsertion(existingPath) < 0) {
-        // Existing path for parent node has precedence, do nothing.
-      }
-      else {
-        // No existing path for parent node, or our path has precedence.
-        pathForCommitId.set(primaryParentId, path);
-      }
-      // Keep track of child ids for node relationships
-      for (const parentId of commit.parents) {
-        if ( ! childIdsForCommitId.has(parentId)) {
-          childIdsForCommitId.set(parentId, []);
-        }
-        childIdsForCommitId.get(parentId).push(commit.id);
-      }
-      // Update node relationships
-      for (const childId of childIdsForCommitId.get(commit.id) ?? []) {
-        const childNode = nodeForCommitId.get(childId);
-        if (childNode === undefined) {
-          continue;
-        }
-        node.children.push(childNode);
-        for (const [parentIndex, parentId] of childNode.commit.parents.entries() ?? []) {
-          const parentNode = nodeForCommitId.get(parentId);
-          if (parentNode !== undefined) {
-            childNode.parents[parentIndex] = parentNode;
-          }
-        }
-      }
-      // Add path name candidates from refs
-      const refs = refsByCommitId[commit.id] ?? [];
-      for (const ref of refs) {
-        path.nameCandidatesFromRefs.push(ref.refName);
-      }
-      // Add path name candidates from commit subject lines
-      const { mergeSourceBranchName, mergeTargetBranchName } = parseBranchNamesFromSubject(commit.subject);
-      if (mergeTargetBranchName !== undefined) {
-        // Current commit is a merge commit. Use the merge target branch name as a candidate.
-        path.nameCandidatesFromCommitSubjectLines.push(mergeTargetBranchName);
-      }
-      if (mergeSourceBranchName !== undefined) {
-        // Current commit is a merge commit. Use the merge source branch name as a candidate for the secondary parent's path.
-        const secondaryParentCommitId = commit.parents[1];
-        const secondaryParentPath = getOrCreatePathForCommitId(secondaryParentCommitId);
-        secondaryParentPath.nameCandidatesFromCommitSubjectLines.push(mergeSourceBranchName);
-      }
-    }
+    const {
+      paths,
+      nodeForCommitId,
+    } = await collectPaths(commits, refsByCommitId, pathRefPriorityForCommitId);
 
-    // Add placeholder parent nodes where needed
-    for (const commit of commits) {
-      const node = nodeForCommitId.get(commit.id);
-      if (node.parents.length === commit.parents.length) {
-        continue;
-      }
-      for (const [parentIndex, parentId] of commit.parents.entries()) {
-        if (node.parents[parentIndex] !== undefined) {
-          continue;
-        }
-        node.parents[parentIndex] = new Node({
-          commit: new Commit({id: parentId}),
-          path: null,
-          row: maxRow,
-          isPlaceholder: true,
-        });
-      }
-    }
+    addPlaceholderParents(commits, nodeForCommitId, maxRow);
 
-    // Remove empty paths
-    paths = paths.filter(path => path.nodes.length > 0);
+    sortPaths(paths);
 
-    // Sort paths
-    for (const path of paths) {
-      path.mergeCount = 0;
-      for (const node of path.nodes) {
-        if (node.parents.length > 1) {
-          path.mergeCount += 1;
-        }
-      }
-    }
-    /**
-     * @param {Path} pathA
-     * @param {Path} pathB
-     */
-    const comparePaths = (pathA, pathB) => {
-      // Prioritize paths with known name priority
-      const pathANamePriority = pathA.getPathNamePriority();
-      const pathBNamePriority = pathB.getPathNamePriority();
-      if (pathBNamePriority - pathANamePriority !== 0) {
-        return pathBNamePriority - pathANamePriority;
-      }
-      // Prioritize paths that have parents with high merge count
-      const pathAMergeCountPriority = pathA.getMergeCountPriority();
-      const pathBMergeCountPriority = pathB.getMergeCountPriority();
-      if (pathBMergeCountPriority - pathAMergeCountPriority !== 0) {
-        return pathBMergeCountPriority - pathAMergeCountPriority;
-      }
-      // Prioritize high merge count
-      if (pathB.mergeCount - pathA.mergeCount !== 0) {
-        return pathB.mergeCount - pathA.mergeCount;
-      }
-      // Prioritize ancestor paths over descendant paths
-      const pathAAncestorCount = pathA.getAncestorCount();
-      const pathBAncestorCount = pathB.getAncestorCount();
-      if (pathAAncestorCount - pathBAncestorCount !== 0) {
-        return pathAAncestorCount - pathBAncestorCount;
-      }
-      // Prioritize shorter paths, considering open paths to always be longer than closed paths.
-      const pathAIsOpen = pathA.getIsOpenPath();
-      const pathBIsOpen = pathB.getIsOpenPath();
-      if (pathAIsOpen && ! pathBIsOpen) {
-        return 1;
-      }
-      if ( ! pathAIsOpen && pathBIsOpen) {
-        return -1;
-      }
-      const pathALength = pathA.getExtendedEndIndex() - pathA.getExtendedStartIndex();
-      const pathBLength = pathB.getExtendedEndIndex() - pathB.getExtendedStartIndex();
-      if (pathBLength - pathALength !== 0) {
-        // If both paths are open, prioritize longer paths.
-        if (pathAIsOpen && pathBIsOpen) {
-          return pathBLength - pathALength;
-        }
-        else {
-          return pathALength - pathBLength;
-        }
-      }
-      return 0;
-    };
-    paths.sort(comparePaths);
+    const {
+      columns,
+      nodelessPathColumnIndices,
+      lastPathByColumnIndex,
+    } = assignPathColumns(paths, {shouldHideIndeterminateMergeEdges});
 
-    // Select columns for paths
-    const columns = [];
-    const nodelessPathColumnIndices = {};
-    const lastPathByColumnIndex = [];
-    for (const path of paths) {
-      const pathStart = path.getExtendedStartIndex();
-      const pathEnd = path.getExtendedEndIndex();
-      const minColumnIndex = path.getPrimaryParentPath()?.columnIndex ?? 0;
-      let selectedColumnIndex = undefined;
-      let indeterminateMergeEdgeCounter = 0;
-      const columnIterator = columns.values();
-
-      const assignColumnsForHighToLowMergeEdges = function(column) {
-        // Look for merges from higher priority paths into this path and give them their own columns.
-        for (const node of path.nodes) {
-          const secondaryParents = node.parents.slice(1);
-          const parentsWithPath = secondaryParents.filter(node => node.path !== null);
-          for (const parentNode of parentsWithPath) {
-            // If there is a node within the parentNode's Path between the parentNode and this node
-            // then the merge edge would overlap that node and will need its own column. Otherwise skip as its not needed.
-            const edgeWouldOverlapNodes = node.row < parentNode.getPreviousNodeInPath()?.row;
-            if ( ! edgeWouldOverlapNodes) {
-              continue;
-            }
-            const parentHasPriority = comparePaths(parentNode.path, path) < 0;
-            if ( ! parentHasPriority) {
-              continue;
-            }
-            if (parentNode.isPlaceholder && shouldHideIndeterminateMergeEdges) {
-              continue;
-            }
-            const range = {start: node.row, end: parentNode.row};
-            while (getIsOverlappingOccupiedRange(column, range.start, range.end)) {
-              column = getNextColumn(columnIterator);
-            }
-            column.occupiedRanges.push(range);
-            const parentIndex = node.parents.indexOf(parentNode);
-            nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = column.columnIndex;
-            while ( ! getIsColumnValidForPath(column, pathStart, pathEnd)) {
-              column = getNextColumn(columnIterator);
-            }
-          }
-        }
-        // Look for merges with unknown parents and give them their own columns.
-        // Reversed order makes the edges nest instead of cross each other.
-        for (const node of path.nodes.toReversed()) {
-          const secondaryParents = node.parents.slice(1);
-          const parentsWithoutPath = secondaryParents.filter(node => node.path === null);
-          for (const parentNode of parentsWithoutPath) {
-            const parentIndex = node.parents.indexOf(parentNode);
-            if (parentNode.isPlaceholder && node !== node.path.getLastNode() && shouldHideIndeterminateMergeEdges) {
-              indeterminateMergeEdgeCounter += 1;
-              nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = column.columnIndex + indeterminateMergeEdgeCounter + 1;
-              continue;
-            }
-            const range = {start: node.row, end: parentNode.row};
-            let nextColumn = getNextColumn(columnIterator);
-            while (getIsOverlappingOccupiedRange(nextColumn, range.start, range.end)) {
-              nextColumn = getNextColumn(columnIterator);
-            }
-            nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = nextColumn.columnIndex;
-            nextColumn.occupiedRanges.push(range);
-          }
-        }
-        return column;
-      };
-
-      const getNextColumn = function(columnIterator) {
-        let nextColumn;
-        const next = columnIterator.next();
-        if (next.done) {
-          nextColumn = {
-            columnIndex: columns.length,
-            occupiedRanges: [],
-          };
-          columns.push(nextColumn);
-        }
-        else {
-          nextColumn = next.value;
-        }
-        return nextColumn;
-      };
-
-      const getIsOverlappingOccupiedRange = function(column, pathStart, pathEnd) {
-        let isOverlappingOccupiedRange = false;
-        for (const {start, end} of column.occupiedRanges) {
-          if (pathStart < end && pathEnd > start) {
-            isOverlappingOccupiedRange = true;
-            break;
-          }
-        }
-        return isOverlappingOccupiedRange;
-      };
-
-      const getIsColumnValidForPath = function(column, pathStart, pathEnd) {
-        if (column.columnIndex < minColumnIndex) {
-          return false;
-        }
-        if (getIsOverlappingOccupiedRange(column, pathStart, pathEnd)) {
-          return false;
-        }
-        return true;
-      };
-
-      for (let column of columnIterator) {
-        if ( ! getIsColumnValidForPath(column, pathStart, pathEnd)) {
-          continue;
-        }
-        else {
-          column = assignColumnsForHighToLowMergeEdges(column);
-          // Assign column for path
-          column.occupiedRanges.push({start: pathStart, end: pathEnd});
-          selectedColumnIndex = column.columnIndex;
-          break;
-        }
-      }
-      if (selectedColumnIndex === undefined) {
-        let column = {
-          columnIndex: columns.length,
-          occupiedRanges: [],
-        };
-        columns.push(column);
-        column = assignColumnsForHighToLowMergeEdges(column);
-        // Assign column for path
-        column.occupiedRanges.push({start: pathStart, end: pathEnd});
-        selectedColumnIndex = column.columnIndex;
-      }
-      path.columnIndex = selectedColumnIndex;
-      const currentLastPath = lastPathByColumnIndex[path.columnIndex];
-      if (currentLastPath === undefined || path.getLastNode().row > currentLastPath.getLastNode().row) {
-        lastPathByColumnIndex[path.columnIndex] = path;
-      }
-    }
     // Update max column
     const maxColumn = columns.length;
 
@@ -848,183 +335,9 @@ export class GraphElement extends HTMLElement {
       if (isBatchSizeReached) {
         await requestIdlePromise(maxWaitMs);
       }
-      function renderRef(ref) {
-        const rightArrow = '\u2192';
-        let refName = asTextContent(ref.refName);
-        let refTitle = refName;
-        let refTypeClass;
-        let remotePart = '';
-        let iconPart = '';
-        if (ref.refType === null) {
-          refTypeClass = 'special-ref';
-        } else {
-          refTypeClass = `ref-${ref.refType}`;
-        }
-        if (ref.refName === 'HEAD') {
-          refName = `YOU ARE HERE ${rightArrow}`;
-          refTitle = '';
-        } else if (ref.refType === 'stash') {
-          refName = 'Your latest stash';
-          refTitle = '';
-          iconPart = '<svg-icon src="img/icon-box-package.svg" title="Your latest stash"></svg-icon>';
-        } else if (ref.refType === 'remotes') {
-          let remoteName;
-          // TODO: Remotes can have slashes, although you should probably be slapped if you do that.
-          [remoteName, refName] = splitOnce(ref.refName, '/');
-          refName = asTextContent(refName);
-          remotePart = `<span class="ref-part-remote">(${asTextContent(remoteName)})</span>`;
-          iconPart = `<svg-icon src="img/icon-share.svg" title="Remote branch"></svg-icon>`;
-        }
-        else if (ref.refType === 'tags') {
-          iconPart = '<svg-icon src="img/icon-tag.svg" title="Tag"></svg-icon>';
-        }
-        else if (ref.refType === 'heads') {
-          iconPart = '<svg-icon src="img/icon-branching.svg" title="Local branch"></svg-icon>';
-        }
-        return `<div class="ref ${asTextContent(refTypeClass)}" title="${refTitle}">${remotePart}${iconPart}<span class="ref-part-name">${refName}</span></div>`;
-      }
-      function getEdges() {
-        const xOffset = columnWidth / 2;
-        const yOffset = rowHeight / 2;
-        const cornerOffset = rowHeight / 3;
-        const edges = [];
-        for (const [parentIndex, parentId] of commit.parents.entries()) {
-          const isPrimaryParent = parentIndex === 0;
-          const parentNode = nodeForCommitId.get(parentId);
-          const parentHasPriority = parentNode !== undefined ? parentNode.path.columnIndex < node.path.columnIndex : false;
-          const edgeColumnIndex = nodelessPathColumnIndices[`${node.row}-${parentIndex}`];
-          const edgeHasOwnColumn = edgeColumnIndex !== undefined;
-          const isLastPathOfColumn = lastPathByColumnIndex[node.path.columnIndex] === node.path;
-          const isLastNode = node === node.path.getLastNode();
-          const isLastNodeOfLastPathOfColumn = isLastPathOfColumn && isLastNode;
-          const pathCommands = [];
-          let isIndeterminate = false;
-          let strokeColor = colors[0];
-          if (isPrimaryParent && parentNode === undefined) {
-            // Parent has not been parsed yet. Draw a simple line through the bottom of the graph.
-            isIndeterminate = ! isLastNodeOfLastPathOfColumn;
-            const startX = node.path.columnIndex;
-            const startY = 0;
-            pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
-            const endX = node.path.columnIndex;
-            const endY = isIndeterminate ? 1 : (maxRow + 1 - node.row);
-            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-            // Duplicate the end point for animations as they require a consistent number of points to transition.
-            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-            strokeColor = colors[node.path.columnIndex % colors.length];
-          }
-          else if (parentNode === undefined) {
-            // Parent has not been parsed yet. Draw a line with a corner through the bottom of the graph.
-            isIndeterminate = ! isLastNodeOfLastPathOfColumn && shouldHideIndeterminateMergeEdges;
-            const startX = node.path.columnIndex;
-            const startY = 0;
-            pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
-            const cornerX = edgeColumnIndex;
-            const cornerY = 0;
-            pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset + cornerOffset}`);
-            const endX = edgeColumnIndex;
-            const endY = isIndeterminate ? 1 : (maxRow + 1 - node.row);
-            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-            // Duplicate the end point for animations as they require a consistent number of points to transition.
-            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-            strokeColor = colors[edgeColumnIndex % colors.length];
-          }
-          else if (node.path === parentNode.path) {
-            // Edge is within the same path. Draw a simple line.
-            const startX = node.path.columnIndex;
-            const startY = 0;
-            pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
-            const endX = parentNode.path.columnIndex;
-            const endY = parentNode.row - node.row;
-            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-            // Duplicate the end point for animations as they require a consistent number of points to transition.
-            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-            strokeColor = colors[node.path.columnIndex % colors.length];
-          }
-          else if (isPrimaryParent) {
-            // Edge is converging. Draw a line with a corner.
-            const startX = node.path.columnIndex;
-            const startY = 0;
-            pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
-            const cornerX = node.path.columnIndex;
-            const cornerY = parentNode.row - node.row;
-            pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset - cornerOffset}`);
-            const endX = parentNode.path.columnIndex;
-            const endY = parentNode.row - node.row;
-            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-            strokeColor = colors[node.path.columnIndex % colors.length];
-          }
-          else if (parentHasPriority && edgeHasOwnColumn) {
-            // Edge is diverging from top right to bottom left. Draw a line with a corner.
-            // From a high priority path to a low priority path. For example merge main to develop.
-            const startX = node.path.columnIndex;
-            const startY = 0;
-            pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
-            const cornerX = edgeColumnIndex;
-            const cornerY = 0;
-            pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset + cornerOffset}`);
-            const endX = parentNode.path.columnIndex;
-            const endY = parentNode.row - node.row;
-            pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${endY * rowHeight + yOffset - cornerOffset}`);
-            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-            strokeColor = colors[parentNode.path.columnIndex % colors.length];
-          }
-          else {
-            // Edge is diverging from top left to bottom right. Draw a line with a corner.
-            // From a low priority path to a high priority path. For example merge develop to main.
-            const startX = node.path.columnIndex;
-            const startY = 0;
-            pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
-            const cornerX = parentNode.path.columnIndex;
-            const cornerY = 0;
-            pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset + cornerOffset}`);
-            const endX = parentNode.path.columnIndex;
-            const endY = parentNode.row - node.row;
-            pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-            strokeColor = colors[parentNode.path.columnIndex % colors.length];
-          }
-          const pathString = pathCommands.join(' ');
-          /** @type {EdgeContext} */
-          const edgeContext = {
-            pathString,
-            totalLength: calculatePathStringLength(pathString),
-            strokeColor,
-            isIndeterminate,
-          };
-          edges.push(edgeContext);
-        }
-        return edges;
-      }
       // Refs
       const commitRefs = refsByCommitId[commit.id] ?? [];
-      commitRefs.sort((a, b) => {
-        let refTypeA = a.refType;
-        let refTypeB = b.refType;
-        if (a.isPointedToByHEAD && b.refType === 'HEAD') {
-          return 1;
-        }
-        if (b.isPointedToByHEAD && a.refType === 'HEAD') {
-          return -1;
-        }
-        if (a.isPointedToByHEAD) {
-          refTypeA = 'HEAD';
-        }
-        if (b.isPointedToByHEAD) {
-          refTypeB = 'HEAD';
-        }
-        const refTypeOrder = {
-          'HEAD': 0,
-          'tags': 1,
-          'heads': 2,
-          'remotes': 3,
-        };
-        const refTypeOrderOther = 4;
-        const refTypeOrderResult = (refTypeOrder[refTypeB] ?? refTypeOrderOther) - (refTypeOrder[refTypeA] ?? refTypeOrderOther);
-        if (refTypeOrderResult !== 0) {
-          return refTypeOrderResult;
-        }
-        return a.refName.localeCompare(b.refName);
-      });
+      commitRefs.sort(compareRefs);
       for (const ref of commitRefs) {
         const oldRefContext = refContextByRefPath[ref.fullRefPath];
         /** @type {ReferenceContext} */
@@ -1039,7 +352,19 @@ export class GraphElement extends HTMLElement {
       // Node
       const node = nodeForCommitId.get(commit.id);
       const color = colors[node.path.columnIndex % colors.length];
-      const edges = getEdges();
+      const edges = getEdges({
+        commit,
+        node,
+        nodeForCommitId,
+        nodelessPathColumnIndices,
+        lastPathByColumnIndex,
+        maxRow,
+      }, {
+        colors,
+        columnWidth,
+        rowHeight,
+        shouldHideIndeterminateMergeEdges,
+      });
       /** @type {CommitContext} */
       const newCommitContext = {
         commit: commit,
