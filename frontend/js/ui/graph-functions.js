@@ -531,7 +531,7 @@ export function getEdges(context, options) {
     const isLastPathOfColumn = lastPathByColumnIndex[node.path.columnIndex] === node.path;
     const isLastNode = node === node.path.getLastNode();
     const isLastNodeOfLastPathOfColumn = isLastPathOfColumn && isLastNode;
-    const pathCommands = [];
+    const edgePoints = [];
     let isIndeterminate = false;
     let strokeColor = colors[0];
     if (isPrimaryParent && parentNode === undefined) {
@@ -539,12 +539,10 @@ export function getEdges(context, options) {
       isIndeterminate = ! isLastNodeOfLastPathOfColumn;
       const startX = node.path.columnIndex;
       const startY = 0;
-      pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
+      edgePoints.push([startX * columnWidth + xOffset, startY * rowHeight + yOffset]);
       const endX = node.path.columnIndex;
       const endY = isIndeterminate ? 1 : (maxRow + 1 - node.row);
-      pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-      // Duplicate the end point for animations as they require a consistent number of points to transition.
-      pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
+      edgePoints.push([endX * columnWidth + xOffset, endY * rowHeight + yOffset]);
       strokeColor = colors[node.path.columnIndex % colors.length];
     }
     else if (parentNode === undefined) {
@@ -552,40 +550,36 @@ export function getEdges(context, options) {
       isIndeterminate = ! isLastNodeOfLastPathOfColumn && shouldHideIndeterminateMergeEdges;
       const startX = node.path.columnIndex;
       const startY = 0;
-      pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
+      edgePoints.push([startX * columnWidth + xOffset, startY * rowHeight + yOffset]);
       const cornerX = edgeColumnIndex;
       const cornerY = 0;
-      pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset + cornerOffset}`);
+      edgePoints.push([cornerX * columnWidth + xOffset, cornerY * rowHeight + yOffset + cornerOffset]);
       const endX = edgeColumnIndex;
       const endY = isIndeterminate ? 1 : (maxRow + 1 - node.row);
-      pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-      // Duplicate the end point for animations as they require a consistent number of points to transition.
-      pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
+      edgePoints.push([endX * columnWidth + xOffset, endY * rowHeight + yOffset]);
       strokeColor = colors[edgeColumnIndex % colors.length];
     }
     else if (node.path === parentNode.path) {
       // Edge is within the same path. Draw a simple line.
       const startX = node.path.columnIndex;
       const startY = 0;
-      pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
+      edgePoints.push([startX * columnWidth + xOffset, startY * rowHeight + yOffset]);
       const endX = parentNode.path.columnIndex;
       const endY = parentNode.row - node.row;
-      pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
-      // Duplicate the end point for animations as they require a consistent number of points to transition.
-      pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
+      edgePoints.push([endX * columnWidth + xOffset, endY * rowHeight + yOffset]);
       strokeColor = colors[node.path.columnIndex % colors.length];
     }
     else if (isPrimaryParent) {
       // Edge is converging. Draw a line with a corner.
       const startX = node.path.columnIndex;
       const startY = 0;
-      pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
+      edgePoints.push([startX * columnWidth + xOffset, startY * rowHeight + yOffset]);
       const cornerX = node.path.columnIndex;
       const cornerY = parentNode.row - node.row;
-      pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset - cornerOffset}`);
+      edgePoints.push([cornerX * columnWidth + xOffset, cornerY * rowHeight + yOffset - cornerOffset]);
       const endX = parentNode.path.columnIndex;
       const endY = parentNode.row - node.row;
-      pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
+      edgePoints.push([endX * columnWidth + xOffset, endY * rowHeight + yOffset]);
       strokeColor = colors[node.path.columnIndex % colors.length];
     }
     else if (parentHasPriority && edgeHasOwnColumn) {
@@ -593,14 +587,14 @@ export function getEdges(context, options) {
       // From a high priority path to a low priority path. For example merge main to develop.
       const startX = node.path.columnIndex;
       const startY = 0;
-      pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
+      edgePoints.push([startX * columnWidth + xOffset, startY * rowHeight + yOffset]);
       const cornerX = edgeColumnIndex;
       const cornerY = 0;
-      pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset + cornerOffset}`);
+      edgePoints.push([cornerX * columnWidth + xOffset, cornerY * rowHeight + yOffset + cornerOffset]);
       const endX = parentNode.path.columnIndex;
       const endY = parentNode.row - node.row;
-      pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${endY * rowHeight + yOffset - cornerOffset}`);
-      pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
+      edgePoints.push([cornerX * columnWidth + xOffset, endY * rowHeight + yOffset - cornerOffset]);
+      edgePoints.push([endX * columnWidth + xOffset, endY * rowHeight + yOffset]);
       strokeColor = colors[parentNode.path.columnIndex % colors.length];
     }
     else {
@@ -608,18 +602,27 @@ export function getEdges(context, options) {
       // From a low priority path to a high priority path. For example merge develop to main.
       const startX = node.path.columnIndex;
       const startY = 0;
-      pathCommands.push(`M ${startX * columnWidth + xOffset} ${startY * rowHeight + yOffset}`);
+      edgePoints.push([startX * columnWidth + xOffset, startY * rowHeight + yOffset]);
       const cornerX = parentNode.path.columnIndex;
       const cornerY = 0;
-      pathCommands.push(`L ${cornerX * columnWidth + xOffset} ${cornerY * rowHeight + yOffset + cornerOffset}`);
+      edgePoints.push([cornerX * columnWidth + xOffset, cornerY * rowHeight + yOffset + cornerOffset]);
       const endX = parentNode.path.columnIndex;
       const endY = parentNode.row - node.row;
-      pathCommands.push(`L ${endX * columnWidth + xOffset} ${endY * rowHeight + yOffset}`);
+      edgePoints.push([endX * columnWidth + xOffset, endY * rowHeight + yOffset]);
       strokeColor = colors[parentNode.path.columnIndex % colors.length];
     }
-    const pathString = pathCommands.join(' ');
+    // For consistent animations all edges should have the same number of points.
+    const edgePointCount = 4;
+    let pathString = '';
+    for (let i = 0; i < edgePointCount; i++) {
+      // Last point will be duplicated if there are no more points.
+      const [x, y] = edgePoints[i] ?? edgePoints.at(-1);
+      const svgCommand = i === 0 ? 'M' : 'L';
+      pathString += `${svgCommand}${x},${y} `;
+    }
     /** @type {EdgeContext} */
     const edgeContext = {
+      edgePoints,
       pathString,
       totalLength: calculatePathStringLength(pathString),
       strokeColor,

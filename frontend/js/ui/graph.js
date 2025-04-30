@@ -279,28 +279,13 @@ export class GraphElement extends HTMLElement {
     document.addEventListener('scroll', renderVisibleCommits);
     window.addEventListener('resize', renderVisibleCommits);
   }
-  /** @param {{ commits: Commit[], refs: Object.<string, Reference> }} args */
-  async renderCommits({ commits, refs }) {
-    /** @type {HTMLElement} */
-    const commitsContainer = this.querySelector('.commits');
-    //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
-    //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
-    const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
-    const columnWidth = 24;
-    const rowHeight = 32;
-    const graphThicknessBase = 32;
-    const redrawTransitionDurationMs = 1000;
-    const maxRow = commits.length - 1;
-    const knownCommitIdsForEnterLeaveAnimation = [];
-    const knownRefPathsForEnterLeaveAnimation = [];
-    const { viewportMinRowIndex, viewportMaxRowIndex } = getViewportMinMaxRows();
-    previousViewportRowIndices.min = viewportMinRowIndex;
-    previousViewportRowIndices.max = viewportMaxRowIndex;
 
-    commitsContainer.style.setProperty('--column-width', columnWidth + 'px');
-    commitsContainer.style.setProperty('--row-height', rowHeight + 'px');
-    commitsContainer.style.setProperty('--graph-thickness-base', graphThicknessBase + 'px');
-    commitsContainer.style.setProperty('--max-row', maxRow.toString());
+  /**
+   * @param {Commit[]} commits
+   * @param {Object.<string, Reference>} refs
+   */
+  static async prepareData(commits, refs) {
+    const maxRow = commits.length - 1;
 
     const {
       refsByCommitId,
@@ -321,6 +306,49 @@ export class GraphElement extends HTMLElement {
       nodelessPathColumnIndices,
       lastPathByColumnIndex,
     } = assignPathColumns(paths, {shouldHideIndeterminateMergeEdges});
+
+    return {
+      refsByCommitId,
+      nodeForCommitId,
+      nodelessPathColumnIndices,
+      lastPathByColumnIndex,
+      columns,
+      paths,
+      maxRow,
+    };
+  }
+
+  /** @param {{ commits: Commit[], refs: Object.<string, Reference> }} args */
+  async renderCommits({ commits, refs }) {
+    /** @type {HTMLElement} */
+    const commitsContainer = this.querySelector('.commits');
+    //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
+    //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
+    const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
+    const columnWidth = 24;
+    const rowHeight = 32;
+    const graphThicknessBase = 32;
+    const redrawTransitionDurationMs = 1000;
+    const knownCommitIdsForEnterLeaveAnimation = [];
+    const knownRefPathsForEnterLeaveAnimation = [];
+
+    const maxRow = commits.length - 1;
+    const { viewportMinRowIndex, viewportMaxRowIndex } = getViewportMinMaxRows();
+    previousViewportRowIndices.min = viewportMinRowIndex;
+    previousViewportRowIndices.max = viewportMaxRowIndex;
+
+    commitsContainer.style.setProperty('--column-width', columnWidth + 'px');
+    commitsContainer.style.setProperty('--row-height', rowHeight + 'px');
+    commitsContainer.style.setProperty('--graph-thickness-base', graphThicknessBase + 'px');
+    commitsContainer.style.setProperty('--max-row', maxRow.toString());
+
+    const {
+      refsByCommitId,
+      nodeForCommitId,
+      nodelessPathColumnIndices,
+      lastPathByColumnIndex,
+      columns,
+    } = await GraphElement.prepareData(commits, refs);
 
     // Update max column
     const maxColumn = columns.length;

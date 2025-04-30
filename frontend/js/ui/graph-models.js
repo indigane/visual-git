@@ -21,6 +21,7 @@ import Reference from '../models/reference.js';
 /**
  * Context data for rendering an edge of a CommitElement.
  * @typedef {Object} EdgeContext
+ * @property {number[][]} edgePoints The point coordinates making the edge.
  * @property {string} pathString The path string (`d`).
  * @property {number} totalLength The total length of the path.
  * @property {string} strokeColor The CSS color of the stroke.

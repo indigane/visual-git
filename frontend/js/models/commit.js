@@ -26,7 +26,7 @@ export default class Commit {
    */
   constructor({ ...props }) {
     this.id = props.id;
-    this.parents = props.parents;
+    this.parents = props.parents ?? [];
     this.authorName = props.authorName;
     this.authorEmail = props.authorEmail;
     this.authorDate = props.authorDate;

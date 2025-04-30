@@ -208,7 +208,8 @@ function parseLogRawMessage(messageChunk) {
   return { subject, messageBody };
 }
 
-function parseRefsFromDecorateFull(refsRaw, commitId) {
+export function parseRefsFromDecorateFull(refsRaw, commitId) {
+  /** @type Object.<string, Reference> */
   const refs = {};
   if ( ! refsRaw) {
     return refs;
