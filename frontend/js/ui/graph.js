@@ -392,6 +392,9 @@ export class GraphElement extends HTMLElement {
         columnWidth,
         rowHeight,
         shouldHideIndeterminateMergeEdges,
+        xOffset: columnWidth / 2,
+        yOffset: rowHeight / 2,
+        cornerOffset: rowHeight / 3,
       });
       /** @type {CommitContext} */
       const newCommitContext = {

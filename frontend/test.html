@@ -17,7 +17,7 @@
         const tests = (await import(testPath)).default;
         for (const testFunction of tests) {
           try {
-            testFunction();
+            await testFunction();
             console.info(`%cTest passed: ${testPath}::${testFunction.name}`, 'color: #0f0;');
           } catch (error) {
             console.error(`Test failed: ${testPath}::${testFunction.name}\n\n`, error);

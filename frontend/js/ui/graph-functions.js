@@ -501,6 +501,9 @@ export function compareRefs(a, b) {
  * @param {number} options.columnWidth
  * @param {number} options.rowHeight
  * @param {boolean} options.shouldHideIndeterminateMergeEdges
+ * @param {number} options.xOffset
+ * @param {number} options.yOffset
+ * @param {number} options.cornerOffset
  */
 export function getEdges(context, options) {
   const {
@@ -517,10 +520,7 @@ export function getEdges(context, options) {
     rowHeight,
     shouldHideIndeterminateMergeEdges,
   } = options;
-
-  const xOffset = columnWidth / 2;
-  const yOffset = rowHeight / 2;
-  const cornerOffset = rowHeight / 3;
+  const { xOffset, yOffset, cornerOffset } = options;
   const edges = [];
   for (const [parentIndex, parentId] of commit.parents.entries()) {
     const isPrimaryParent = parentIndex === 0;
