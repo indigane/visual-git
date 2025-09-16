@@ -1,11 +1,12 @@
+import { adoptWebComponentStyleSheet, loadWebComponentTemplates } from "../webcomponents.js";
 import {
   animateCommitEnter,
   animateCommitLeave,
   animateRefEnter,
   animateRefTransition,
-} from './animations.js';
-import Commit from '../models/commit.js';
-import Reference from '../models/reference.js';
+} from '../animations.js';
+import Commit from '../../models/commit.js';
+import Reference from '../../models/reference.js';
 import {
   addPlaceholderParents,
   assignPathColumns,
@@ -15,11 +16,15 @@ import {
   compareRefs,
   renderRef,
   sortPaths,
-} from './graph-functions.js';
-import { requestIdlePromise } from '../utils.js';
+} from '../graph-functions.js';
+import { requestIdlePromise } from '../../utils.js';
 /** @typedef {import('graph-models.js').CommitContext} CommitContext */
 /** @typedef {import('graph-models.js').EdgeContext} EdgeContext */
 /** @typedef {import('graph-models.js').ReferenceContext} ReferenceContext */
+
+
+adoptWebComponentStyleSheet(import.meta.url);
+const [ graphTemplate, commitTemplate ] = await loadWebComponentTemplates(import.meta.url);
 
 
 // TOOD: This should be a setting
@@ -70,12 +75,7 @@ export class GraphElement extends HTMLElement {
   constructor() {
     super();
     const graph = this;
-    graph.insertAdjacentHTML('beforeend', `
-      <div class="commits"></div>
-      <div class="refs"></div>
-    `);
-    /** @type {HTMLTemplateElement} */
-    graph.commitTemplate = document.querySelector('#commit-template');
+    graph.appendChild(graphTemplate.content.cloneNode(true));
     /** @type {HTMLElement} */
     graph.commitsContainer = graph.querySelector('.commits');
     graph.commitElementPool = GraphElement.getCommitElementPool(graph);
@@ -399,7 +399,7 @@ export class GraphElement extends HTMLElement {
    * }} CommitElement
    */
   createCommitElement() {
-    const clonedFragment = /** @type {DocumentFragment} */ (this.commitTemplate.content.cloneNode(true));
+    const clonedFragment = /** @type {DocumentFragment} */ (commitTemplate.content.cloneNode(true));
     const commitElement = /** @type {CommitElement} */ (clonedFragment.firstElementChild);
     this.commitsContainer.appendChild(commitElement);
     commitElement._elems = {
