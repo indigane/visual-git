@@ -1,7 +1,7 @@
 import * as git from './git-interface/commands.js';
 import { GithubProvider } from './github-interface/github.js';
 import { SettingsElement } from './ui/settings.js';
-import { GraphElement } from './ui/graph.js';
+import { GraphElement } from './ui/graph/graph.js';
 import { debounce } from './utils.js';
 
 function setUpLocal() {
