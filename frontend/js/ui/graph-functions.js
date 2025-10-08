@@ -434,20 +434,20 @@ export function renderRef(ref) {
   } else if (ref.refType === 'stash') {
     refName = 'Your latest stash';
     refTitle = '';
-    iconPart = '<svg-icon src="img/icon-box-package.svg" title="Your latest stash"></svg-icon>';
+    iconPart = '<svg-icon src="/img/icon-box-package.svg" title="Your latest stash"></svg-icon>';
   } else if (ref.refType === 'remotes') {
     let remoteName;
     // TODO: Remotes can have slashes, although you should probably be slapped if you do that.
     [remoteName, refName] = splitOnce(ref.refName, '/');
     refName = asTextContent(refName);
     remotePart = `<span class="ref-part-remote">(${asTextContent(remoteName)})</span>`;
-    iconPart = `<svg-icon src="img/icon-share.svg" title="Remote branch"></svg-icon>`;
+    iconPart = `<svg-icon src="/img/icon-share.svg" title="Remote branch"></svg-icon>`;
   }
   else if (ref.refType === 'tags') {
-    iconPart = '<svg-icon src="img/icon-tag.svg" title="Tag"></svg-icon>';
+    iconPart = '<svg-icon src="/img/icon-tag.svg" title="Tag"></svg-icon>';
   }
   else if (ref.refType === 'heads') {
-    iconPart = '<svg-icon src="img/icon-branching.svg" title="Local branch"></svg-icon>';
+    iconPart = '<svg-icon src="/img/icon-branching.svg" title="Local branch"></svg-icon>';
   }
   return `<div class="ref ${asTextContent(refTypeClass)}" title="${refTitle}">${remotePart}${iconPart}<span class="ref-part-name">${refName}</span></div>`;
 }
