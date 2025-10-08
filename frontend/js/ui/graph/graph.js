@@ -30,10 +30,6 @@ const [ graphTemplate, commitTemplate ] = await loadWebComponentTemplates(import
 // TOOD: This should be a setting
 const shouldHideIndeterminateMergeEdges = true;
 
-
-/** @type {Object.<string, CommitContext>} */ const commitContextByCommitId = {};
-/** @type {Object.<number, string>} */ const commitIdByRowIndex = {};
-/** @type {Object.<string, ReferenceContext>} */ const refContextByRefPath = {};
 const previousViewportRowIndices = {
   min: -1,
   max: -1,
@@ -79,6 +75,9 @@ export class GraphElement extends HTMLElement {
     /** @type {HTMLElement} */
     graph.commitsContainer = graph.querySelector('.commits');
     graph.commitElementPool = GraphElement.getCommitElementPool(graph);
+    /** @type {Object.<string, CommitContext>} */ graph.commitContextByCommitId = {};
+    /** @type {Object.<number, string>} */ graph.commitIdByRowIndex = {};
+    /** @type {Object.<string, ReferenceContext>} */ graph.refContextByRefPath = {};
   }
   connectedCallback() {
     document.addEventListener('scroll', this.renderVisibleCommits.bind(this));
@@ -173,7 +172,7 @@ export class GraphElement extends HTMLElement {
         }
       },
       get: function (commitId) {
-        const commitContext = commitContextByCommitId[commitId];
+        const commitContext = graph.commitContextByCommitId[commitId];
         if (this.elementsByCommitId[commitId] !== undefined) {
           return this.elementsByCommitId[commitId];
         }
@@ -192,6 +191,7 @@ export class GraphElement extends HTMLElement {
 
   /** @param {{ commits: Commit[], refs: Object.<string, Reference> }} args */
   async renderCommits({ commits, refs }) {
+    const graph = this;
     //const colors = ['#dd826f', '#8bacd2', '#bad56a', '#ae7fba', '#e8b765', '#f8ed73', '#bab6d8', '#f0cee5', '#a2d2c7'];
     //const colors = ['#68023F', '#008169', '#EF0096', '#00DCB5', '#FFCFE2', '#003C86', '#9400E6', '#009FFA', '#FF71FD', '#7CFFFA', '#6A0213', '#008607', '#F60239', '#00E307', '#FFDC3D'];
     const colors = ['#ee6677', '#228833', '#4477aa', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'];
@@ -207,10 +207,10 @@ export class GraphElement extends HTMLElement {
     previousViewportRowIndices.min = viewportMinRowIndex;
     previousViewportRowIndices.max = viewportMaxRowIndex;
 
-    this.commitsContainer.style.setProperty('--column-width', columnWidth + 'px');
-    this.commitsContainer.style.setProperty('--row-height', rowHeight + 'px');
-    this.commitsContainer.style.setProperty('--graph-thickness-base', graphThicknessBase + 'px');
-    this.commitsContainer.style.setProperty('--max-row', maxRow.toString());
+    graph.commitsContainer.style.setProperty('--column-width', columnWidth + 'px');
+    graph.commitsContainer.style.setProperty('--row-height', rowHeight + 'px');
+    graph.commitsContainer.style.setProperty('--graph-thickness-base', graphThicknessBase + 'px');
+    graph.commitsContainer.style.setProperty('--max-row', maxRow.toString());
 
     const {
       refsByCommitId,
@@ -237,14 +237,14 @@ export class GraphElement extends HTMLElement {
       const commitRefs = refsByCommitId[commit.id] ?? [];
       commitRefs.sort(compareRefs);
       for (const ref of commitRefs) {
-        const oldRefContext = refContextByRefPath[ref.fullRefPath];
+        const oldRefContext = graph.refContextByRefPath[ref.fullRefPath];
         /** @type {ReferenceContext} */
         const newRefContext = {
           ref,
           htmlString: renderRef(ref),
           previousCommitId: oldRefContext?.ref.commitId,
         };
-        refContextByRefPath[ref.fullRefPath] = newRefContext;
+        graph.refContextByRefPath[ref.fullRefPath] = newRefContext;
         knownRefPathsForEnterLeaveAnimation.push(ref.fullRefPath);
       }
       // Node
@@ -278,30 +278,30 @@ export class GraphElement extends HTMLElement {
         maxColumn,
         refs: commitRefs,
       };
-      const oldCommitContext = commitContextByCommitId[commit.id];
+      const oldCommitContext = graph.commitContextByCommitId[commit.id];
       const isOldCommitElementWithinViewport = isCommitInRange(oldCommitContext, viewportMinRowIndex, viewportMaxRowIndex);
       const isNewCommitElementWithinViewport = isCommitInRange(newCommitContext, viewportMinRowIndex, viewportMaxRowIndex);
       if (isOldCommitElementWithinViewport || isNewCommitElementWithinViewport) {
         deferredAnimations.push(() => {
-          const commitElement = this.commitElementPool.get(commit.id);
+          const commitElement = graph.commitElementPool.get(commit.id);
           if (oldCommitContext === undefined) {
             // New commit element
-            this.updateCommitElement(commitElement, {...newCommitContext, transitionDuration: '0s'});
+            graph.updateCommitElement(commitElement, {...newCommitContext, transitionDuration: '0s'});
             // Half duration so that leaving elements are hidden before entering elements appear.
             const halfDuration = redrawTransitionDurationMs / 2;
             animateCommitEnter(commitElement, halfDuration);
           } else {
             // Existing commit element
-            this.updateCommitElement(commitElement, {...newCommitContext, transitionDuration: redrawTransitionDurationMs + 'ms'}, oldCommitContext);
+            graph.updateCommitElement(commitElement, {...newCommitContext, transitionDuration: redrawTransitionDurationMs + 'ms'}, oldCommitContext);
           }
           // Refs
           // TODO: Check if context.refs has changed?
           for (const ref of newCommitContext.refs) {
-            const refContext = refContextByRefPath[ref.fullRefPath];
+            const refContext = graph.refContextByRefPath[ref.fullRefPath];
             if (refContext === undefined) {
               continue;
             }
-            const refOldCommitContext = refContext.previousCommitId && commitContextByCommitId[refContext.previousCommitId];
+            const refOldCommitContext = refContext.previousCommitId && graph.commitContextByCommitId[refContext.previousCommitId];
             if (refOldCommitContext === undefined) {
               animateRefEnter(commitElement, refContext, redrawTransitionDurationMs);
             } else {
@@ -310,29 +310,29 @@ export class GraphElement extends HTMLElement {
           }
         });
       }
-      commitContextByCommitId[commit.id] = newCommitContext;
-      commitIdByRowIndex[newCommitContext.row] = commit.id;
+      graph.commitContextByCommitId[commit.id] = newCommitContext;
+      graph.commitIdByRowIndex[newCommitContext.row] = commit.id;
       knownCommitIdsForEnterLeaveAnimation.push(commit.id);
     }
-    for (const [commitId, commitContext] of Object.entries(commitContextByCommitId)) {
+    for (const [commitId, commitContext] of Object.entries(graph.commitContextByCommitId)) {
       const isCommitGone = knownCommitIdsForEnterLeaveAnimation.includes(commitId) === false;
       if (isCommitGone) {
         const isWithinViewport = isCommitInRange(commitContext, viewportMinRowIndex, viewportMaxRowIndex);
         if (isWithinViewport) {
           deferredAnimations.push(() => {
-            const commitElement = this.commitElementPool.get(commitId);
+            const commitElement = graph.commitElementPool.get(commitId);
             // Half duration so that leaving elements are hidden before entering elements appear.
             const halfDuration = redrawTransitionDurationMs / 2;
-            animateCommitLeave(commitElement, halfDuration).then(() => this.commitElementPool.removeByCommitId(commitId));
+            animateCommitLeave(commitElement, halfDuration).then(() => graph.commitElementPool.removeByCommitId(commitId));
           });
         }
         else {
-          this.commitElementPool.removeByCommitId(commitId);
+          graph.commitElementPool.removeByCommitId(commitId);
         }
-        delete commitContextByCommitId[commitId];
+        delete graph.commitContextByCommitId[commitId];
       }
     }
-    this.commitElementPool.removeOutOfRangeElements();
+    graph.commitElementPool.removeOutOfRangeElements();
     // For now all animations are deferred until the end of graph construction.
     // An optimization is possible:
     // - Move knownCommitIdsForEnterLeaveAnimation to the first-pass for loop.
@@ -345,29 +345,30 @@ export class GraphElement extends HTMLElement {
   }
 
   renderVisibleCommits() {
+    const graph = this;
     const { viewportMinRowIndex, viewportMaxRowIndex } = getViewportMinMaxRows();
     for (let rowIndex = viewportMinRowIndex; rowIndex <= viewportMaxRowIndex; rowIndex++) {
       if (rowIndex >= previousViewportRowIndices.min && rowIndex <= previousViewportRowIndices.max) {
         // The previous viewport already made this row visible.
         continue;
       }
-      const commitId = commitIdByRowIndex[rowIndex];
+      const commitId = graph.commitIdByRowIndex[rowIndex];
       if (commitId === undefined) {
         continue;
       }
-      const commitElement = this.commitElementPool.get(commitId);
-      const commitContext = commitContextByCommitId[commitId];
+      const commitElement = graph.commitElementPool.get(commitId);
+      const commitContext = graph.commitContextByCommitId[commitId];
       if (commitContext !== undefined) {
         // Render any commit that points to this commit as their parent,
         // because those nodes have an edge hanging downwards that needs
         // to be rendered as it connects to this node.
         for (const childCommitId of commitContext.childCommitIds) {
-          this.commitElementPool.get(childCommitId);
+          graph.commitElementPool.get(childCommitId);
         }
         // Refs
         let refsHtml = '';
         for (const ref of commitContext.refs) {
-          const refContext = refContextByRefPath[ref.fullRefPath];
+          const refContext = graph.refContextByRefPath[ref.fullRefPath];
           if (refContext === undefined) {
             continue;
           }
