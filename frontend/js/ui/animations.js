@@ -6,9 +6,13 @@ function distanceBetweenPoints(x1, y1, x2, y2) {
 }
 
 export function calculatePathStringLength(pathString) {
+  // NOTE: This is dependent on the way the path string is formatted.
+  // This will break and has broken, but it is simple so I will keep it for now.
   const pointsArray = pathString
-    .replaceAll('M ', '')
-    .replaceAll('L ', '')
+    .replaceAll('M', '')
+    .replaceAll('L', '')
+    .replaceAll(',', ' ')
+    .trim()
     .split(' ')
     .map(Number);
   let totalLength = 0;
