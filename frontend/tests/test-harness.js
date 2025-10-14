@@ -2,7 +2,7 @@ import { parseRefsFromDecorateFull } from '../js/git-interface/parsers.js';
 import Commit from '../js/models/commit.js';
 import Reference from '../js/models/reference.js';
 import { getEdges } from '../js/ui/graph-functions.js';
-import { Node } from '../js/ui/graph-models.js';
+import { Node, Path } from '../js/ui/graph-models.js';
 import { GraphElement } from '../js/ui/graph/graph.js';
 /** @typedef {import('../js/ui/graph-models.js').EdgeContext} EdgeContext */
 
@@ -26,7 +26,7 @@ function getCommitsAndParseRefs(commitsAndRefs) {
  * @param {[Commit, string][]} commitsAndRefs An array of tuples containing Commit objects and their associated reference decoration strings.
  * @return {Promise<{
  *   commits: Commit[],
- *   paths: any[],
+ *   paths: Path[],
  *   nodeForCommitId: Map<string, Node>,
  *   edgesForCommitId: Partial<{
  *     [commitId: string]: EdgeContext[]
@@ -145,5 +145,37 @@ export function assertEdge(description, node, edge, expected) {
     assert(secondMidPointColumn === expected.secondMidColumn, `${description || 'Edge'} second mid-point should be at column ${expected.secondMidColumn}. Actual: ${secondMidPointColumn}`);
   } else {
     assert(expected.secondMidRow === undefined && expected.secondMidColumn === undefined, `${description || 'Edge'}: Expected second mid-point to be undefined, but it was not.`);
+  }
+};
+
+/** @param {string[]} commitIds */
+function formatCommitIds(commitIds) {
+  return commitIds.join('➜');
+}
+
+/** @param {string} commitIdsString */
+function splitCommitIds(commitIdsString) {
+  return commitIdsString.split(/\W+/).filter(s => s.length > 0);
+}
+
+/** @param {Path} path */
+function formatPath(path) {
+  return formatCommitIds(path.nodes.map(node => node.commit.id));
+}
+
+/** Assert that the path consists of the expected commit IDs in order.
+ * @param {string} description A description of the path being tested, for debugging purposes.
+ * @param {Path} path The path to test.
+ * @param {string[]|string} expectedCommitIds The expected commit IDs in order.
+ */
+export function assertPath(description, path, expectedCommitIds) {
+  if (typeof expectedCommitIds === 'string') {
+    expectedCommitIds = splitCommitIds(expectedCommitIds);
+  }
+  assert(path.nodes.length === expectedCommitIds.length, `${description || 'Path'} should have ${expectedCommitIds.length} nodes. Actual: ${path.nodes.length}.`);
+  for (let i = 0; i < path.nodes.length; i++) {
+    const actualNode = path.nodes[i];
+    const expectedCommitId = expectedCommitIds[i];
+    assert(actualNode.commit.id === expectedCommitId, `${description || 'Path'}: Expected ${formatCommitIds(expectedCommitIds)}. Actual: ${formatPath(path)}.`);
   }
 };
