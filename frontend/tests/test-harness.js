@@ -167,15 +167,29 @@ function formatPath(path) {
  * @param {string} description A description of the path being tested, for debugging purposes.
  * @param {Path} path The path to test.
  * @param {string[]|string} expectedCommitIds The expected commit IDs in order.
+ * @param {object} [options] Additional options for the assertion.
+ * @param {number} [options.column] The expected column index of the path.
  */
-export function assertPath(description, path, expectedCommitIds) {
+export function assertPath(description, path, expectedCommitIds, { column: expectedColumnIndex } = {}) {
   if (typeof expectedCommitIds === 'string') {
     expectedCommitIds = splitCommitIds(expectedCommitIds);
   }
-  assert(path.nodes.length === expectedCommitIds.length, `${description || 'Path'} should have ${expectedCommitIds.length} nodes. Actual: ${path.nodes.length}.`);
+  assert(path.nodes.length === expectedCommitIds.length, `${description || 'Path'} – Expected: ${formatCommitIds(expectedCommitIds)}. Actual: ${formatPath(path)}.`);
   for (let i = 0; i < path.nodes.length; i++) {
     const actualNode = path.nodes[i];
     const expectedCommitId = expectedCommitIds[i];
-    assert(actualNode.commit.id === expectedCommitId, `${description || 'Path'}: Expected ${formatCommitIds(expectedCommitIds)}. Actual: ${formatPath(path)}.`);
+    assert(actualNode.commit.id === expectedCommitId, `${description || 'Path'} – Expected: ${formatCommitIds(expectedCommitIds)}. Actual: ${formatPath(path)}.`);
   }
+  if (expectedColumnIndex !== undefined) {
+    assertPathColumn(description, path, expectedColumnIndex);
+  }
+};
+
+/** Assert that the path occupies the expected column.
+ * @param {string} description A description of the path being tested, for debugging purposes.
+ * @param {Path} path The path to test.
+ * @param {number} expectedColumnIndex The expected column index of the path.
+ */
+export function assertPathColumn(description, path, expectedColumnIndex) {
+  assert(path.columnIndex === expectedColumnIndex, `${description || 'Path'} should occupy column ${expectedColumnIndex}. Actual: ${path.columnIndex}.`);
 };
