@@ -67,60 +67,6 @@ export default [
     assertPath('Second Path', path2, 'C-B', {column: 1});
   },
 
-  async function testTDB() {
-    /** @type {[Commit, string][]} */
-    const commitsAndRefs = [
-      [new Commit({id: 'C', parents: ['A', 'B']}), ''],
-      [new Commit({id: 'B', parents: ['A']}), ''],
-      [new Commit({id: 'A'}), '(refs/heads/main)'],
-    ];
-    renderGraph('TBD', commitsAndRefs);
-  },
-
-  async function testTBD() {
-    /** @type {[Commit, string][]} */
-    const commitsAndRefs = [
-      [new Commit({id: 'D', parents: ['A']}), ''],
-      [new Commit({id: 'C', parents: ['A', 'B']}), ''],
-      [new Commit({id: 'B', parents: ['A']}), ''],
-      [new Commit({id: 'A'}), ''],
-    ];
-    renderGraph('TBD', commitsAndRefs);
-  },
-
-  async function testTBD() {
-    /** @type {[Commit, string][]} */
-    const commitsAndRefs = [
-      [new Commit({id: 'D', parents: ['A', 'B']}), ''],
-      [new Commit({id: 'C', parents: ['A', 'B']}), '(refs/heads/main)'],
-      [new Commit({id: 'B', parents: ['A']}), ''],
-      [new Commit({id: 'A'}), ''],
-    ];
-    renderGraph('TBD', commitsAndRefs);
-  },
-
-  async function testTBD() {
-    /** @type {[Commit, string][]} */
-    const commitsAndRefs = [
-      [new Commit({id: 'D', parents: ['A', 'C']}), '(refs/heads/develop)'],
-      [new Commit({id: 'C', parents: ['A', 'B']}), '(refs/heads/main)'],
-      [new Commit({id: 'B', parents: ['A']}), ''],
-      [new Commit({id: 'A'}), ''],
-    ];
-    renderGraph('TBD', commitsAndRefs);
-  },
-
-  async function testTBD() {
-    /** @type {[Commit, string][]} */
-    const commitsAndRefs = [
-      [new Commit({id: 'D', parents: ['C', 'A']}), '(refs/heads/develop)'],
-      [new Commit({id: 'C', parents: ['A', 'B']}), '(refs/heads/main)'],
-      [new Commit({id: 'B', parents: ['A']}), ''],
-      [new Commit({id: 'A'}), ''],
-    ];
-    renderGraph('TBD', commitsAndRefs);
-  },
-
   async function testMergeHasOwnColumnAscendingPriority() {
     /** @type {[Commit, string][]} */
     const commitsAndRefs = [
@@ -176,7 +122,7 @@ export default [
     renderGraph('Merge has own column, descending priority', commitsAndRefs);
   },
 
-  async function testCrissCrossMerge() {
+  async function testCrissCrossMergeSymmetric() {
     /** @type {[Commit, string][]} */
     const commitsAndRefs = [
       [new Commit({ id: 'M2', parents: ['F', 'B'] }), '(refs/heads/develop)'],
@@ -185,7 +131,7 @@ export default [
       [new Commit({ id: 'B', parents: ['A'] }), ''],
       [new Commit({ id: 'A' }), ''],
     ];
-    renderGraph('Criss-cross merge', commitsAndRefs);
+    renderGraph('Criss-cross merge, symmetric', commitsAndRefs);
     const renderData = await getRenderData(commitsAndRefs);
     const [path1, path2] = renderData.paths;
     assertPath('First path', path1, 'M1-B-A', {column: 0});
@@ -206,7 +152,7 @@ export default [
     });
   },
 
-  async function testCrissCrossMergeDifferentOrder() {
+  async function testCrissCrossMergeSymmetricDifferentOrder() {
     /** @type {[Commit, string][]} */
     const commitsAndRefs = [
       [new Commit({ id: 'M2', parents: ['B', 'F'] }), '(refs/heads/main)'],
@@ -215,8 +161,67 @@ export default [
       [new Commit({ id: 'B', parents: ['A'] }), ''],
       [new Commit({ id: 'A' }), ''],
     ];
-    renderGraph('Criss-cross merge, different order', commitsAndRefs);
+    renderGraph('Criss-cross merge, symmetric, different order', commitsAndRefs);
     // TODO: It's the bug again.
+  },
+
+  async function testCrissCrossMergeChained() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({ id: 'M2', parents: ['B', 'M1'] }), '(refs/heads/main)'],
+      [new Commit({ id: 'M1', parents: ['A', 'B'] }), '(refs/heads/develop)'],
+      [new Commit({ id: 'B', parents: ['A'] }), ''],
+      [new Commit({ id: 'A' }), ''],
+    ];
+    renderGraph('Criss-cross merge, chained', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
+    assertPath('First path', path1, 'M2-B-A', { column: 0 });
+    assertPath('Second path', path2, 'M1', { column: 1 });
+    assertEdges(renderData, {
+      from: { commitId: 'M1', row: 1, column: 1 },
+      to: [
+        { commitId: 'A', row: 3, column: 0, midRow: 3, midColumn: 1 },
+        { commitId: 'B', row: 2, column: 0, midRow: 1, midColumn: 0 },
+      ],
+    });
+    assertEdges(renderData, {
+      from: { commitId: 'M2', row: 0, column: 0 },
+      to: [
+        { commitId: 'B', row: 2, column: 0 },
+        { commitId: 'M1', row: 1, column: 1, midRow: 0, midColumn: 1 },
+      ],
+    });
+  },
+
+  async function testCrissCrossMergeChainedDifferentOrder() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({ id: 'M2', parents: ['F', 'M1'] }), '(refs/heads/develop)'],
+      [new Commit({ id: 'M1', parents: ['B', 'F'] }), '(refs/heads/main)'],
+      [new Commit({ id: 'F', parents: ['B'] }), ''],
+      [new Commit({ id: 'B', parents: ['A'] }), ''],
+      [new Commit({ id: 'A' }), ''],
+    ];
+    renderGraph('Criss-cross merge, chained, different order', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
+    assertPath('First path', path1, 'M1-B-A', { column: 0 });
+    assertPath('Second path', path2, 'M2-F', { column: 1 });
+    assertEdges(renderData, {
+      from: { commitId: 'M1', row: 1, column: 0 },
+      to: [
+        { commitId: 'B', row: 3, column: 0 },
+        { commitId: 'F', row: 2, column: 1, midRow: 1, midColumn: 1 },
+      ],
+    });
+    assertEdges(renderData, {
+      from: { commitId: 'M2', row: 0, column: 1 },
+      to: [
+        { commitId: 'F', row: 2, column: 1 },
+        { commitId: 'M1', row: 1, column: 0, midRow: 0, midColumn: 0 },
+      ],
+    });
   },
 
   // TODO: When settings for branch priority are added,
@@ -301,7 +306,7 @@ export default [
     assertPath('Third Path', path3, 'C', {column: 2});
   },
 
-  async function testBranchPriorityOpenBranchesWithMerge() {
+  async function testBranchPriorityOpenBranchWithMerge() {
     /** @type {[Commit, string][]} */
     const commitsAndRefs = [
       [new Commit({id: 'D', parents: ['A']}), ''],
@@ -309,12 +314,44 @@ export default [
       [new Commit({id: 'B', parents: ['A']}), ''],
       [new Commit({id: 'A'}), ''],
     ];
-    renderGraph('Branch priority open branches, with named branch', commitsAndRefs);
+    renderGraph('Branch priority open branch, with merge', commitsAndRefs);
     const renderData = await getRenderData(commitsAndRefs);
     const [path1, path2, path3] = renderData.paths;
     assertPath('First Path', path1, 'C-A', {column: 0});
     assertPath('Second Path', path2, 'B', {column: 1});
     assertPath('Third Path', path3, 'D', {column: 2});
+  },
+
+  async function testBranchPriorityOpenBranchWithMergeDifferentOrder() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'D', parents: ['A', 'B']}), '(refs/heads/main)'],
+      [new Commit({id: 'C', parents: ['A']}), ''],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Branch priority open branch, with merge, different order', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'D-A', {column: 0});
+    assertPath('Second Path', path2, 'B', {column: 1});
+    assertPath('Third Path', path3, 'C', {column: 2});
+  },
+
+  async function testBranchPriorityOpenBranchWithMergeDifferentOrder2() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'D', parents: ['A', 'C']}), '(refs/heads/main)'],
+      [new Commit({id: 'C', parents: ['A']}), ''],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Branch priority open branch, with merge, different order 2', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'D-A', {column: 0});
+    assertPath('Second Path', path2, 'C', {column: 1});
+    assertPath('Third Path', path3, 'B', {column: 2});
   },
 
   async function testBranchPriorityNestedMerges() {
@@ -349,5 +386,93 @@ export default [
     assertPath('First Path', path1, 'E-D-A', {column: 0});
     assertPath('Second Path', path2, 'C', {column: 1});
     assertPath('Third Path', path3, 'B', {column: 2});
+  },
+
+  async function testTDB() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'C', parents: ['A', 'B']}), ''],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), '(refs/heads/main)'],
+    ];
+    renderGraph('TBD', commitsAndRefs);
+  },
+
+  async function testTBD() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'D', parents: ['A']}), ''],
+      [new Commit({id: 'C', parents: ['A', 'B']}), ''],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('TBD', commitsAndRefs);
+  },
+
+  async function testTBD() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'D', parents: ['A', 'B']}), ''],
+      [new Commit({id: 'C', parents: ['A', 'B']}), '(refs/heads/main)'],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('TBD', commitsAndRefs);
+  },
+
+  async function testTBD() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'D', parents: ['A', 'C']}), '(refs/heads/develop)'],
+      [new Commit({id: 'C', parents: ['A', 'B']}), '(refs/heads/main)'],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('TBD', commitsAndRefs);
+  },
+
+  async function testTBD() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'D', parents: ['C', 'A']}), '(refs/heads/develop)'],
+      [new Commit({id: 'C', parents: ['A', 'B']}), '(refs/heads/main)'],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('TBD', commitsAndRefs);
+  },
+
+  async function testTBD() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({ id: 'M2', parents: ['M1', 'F'] }), '(refs/heads/develop)'],
+      [new Commit({ id: 'M1', parents: ['B', 'F'] }), '(refs/heads/main)'],
+      [new Commit({ id: 'F', parents: ['A'] }), ''],
+      [new Commit({ id: 'B', parents: ['A'] }), ''],
+      [new Commit({ id: 'A' }), ''],
+    ];
+    renderGraph('TBD', commitsAndRefs);
+  },
+
+  async function testTBD() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({ id: 'M2', parents: ['M1', 'B'] }), '(refs/heads/main)'],
+      [new Commit({ id: 'M1', parents: ['B', 'A'] }), '(refs/heads/develop)'],
+      [new Commit({ id: 'B', parents: ['A'] }), ''],
+      [new Commit({ id: 'A' }), ''],
+    ];
+    renderGraph('TBD', commitsAndRefs);
+  },
+
+  async function testTBD() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({ id: 'M2', parents: ['M1', 'B'] }), '(refs/heads/develop)'],
+      [new Commit({ id: 'M1', parents: ['B', 'A'] }), '(refs/heads/main)'],
+      [new Commit({ id: 'B', parents: ['A'] }), ''],
+      [new Commit({ id: 'A' }), ''],
+    ];
+    renderGraph('TBD', commitsAndRefs);
   },
 ];
