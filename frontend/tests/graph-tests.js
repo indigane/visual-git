@@ -1,5 +1,5 @@
 import Commit from '../js/models/commit.js';
-import { assert, assertEdge, assertPath, assertPathColumn, getRenderData, renderGraph } from './test-harness.js';
+import { assert, assertEdge, assertEdges, assertPath, assertPathColumn, getRenderData, renderGraph } from './test-harness.js';
 /** @typedef {import('../js/ui/graph-models.js').EdgeContext} EdgeContext */
 
 export default [
@@ -9,8 +9,9 @@ export default [
       [new Commit({id: 'A'}), '(HEAD -> refs/heads/main)'],
     ];
     renderGraph('Single commit', commitsAndRefs);
-    const { paths } = await getRenderData(commitsAndRefs);
-    assertPath('First Path', paths[0], 'A', {column: 0});
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1] = renderData.paths;
+    assertPath('First Path', path1, 'A', {column: 0});
   },
 
   async function testTwoCommits() {
@@ -20,15 +21,14 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Two commits', commitsAndRefs);
-    const { paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
-    const path1 = paths[0];
-    const edgesB = edgesForCommitId['B'];
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1] = renderData.paths;
     assertPath('First Path', path1, 'B-A', {column: 0});
-    assertEdge('B edge', path1.nodes[0], edgesB[0], {
-      fromRow: 0,
-      toRow: 1,
-      fromColumn: 0,
-      toColumn: 0,
+    assertEdges(renderData, {
+      from: { commitId: 'B', row: 0, column: 0 },
+      to: [
+        { commitId: 'A', row: 1, column: 0 },
+      ],
     });
   },
 
@@ -40,25 +40,16 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Simple merge', commitsAndRefs);
-    const { paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
-    const path1 = paths[0];
-    const path2 = paths[1];
-    const edgesC = edgesForCommitId['C'];
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
     assertPath('First Path', path1, 'C-A', {column: 0});
     assertPath('Second Path', path2, 'B', {column: 1});
-    assertEdge('C to A edge', path1.nodes[0], edgesC[0], {
-      fromRow: 0,
-      toRow: 2,
-      fromColumn: 0,
-      toColumn: 0,
-    });
-    assertEdge('C to B edge', path1.nodes[0], edgesC[1], {
-      fromRow: 0,
-      toRow: 1,
-      fromColumn: 0,
-      toColumn: 1,
-      midRow: 0,
-      midColumn: 1,
+    assertEdges(renderData, {
+      from: { commitId: 'C', row: 0, column: 0 },
+      to: [
+        { commitId: 'A', row: 2, column: 0 },
+        { commitId: 'B', row: 1, column: 1, midRow: 0, midColumn: 1 },
+      ],
     });
   },
 
@@ -70,24 +61,10 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Simple merge, parents swapped', commitsAndRefs);
-    const { paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
-    const path1 = paths[0];
-    const node1 = path1.nodes[0];
-    const edgesC = edgesForCommitId['C'];
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
     assertPath('First Path', path1, 'A', {column: 0});
-    assertPath('Second Path', path1, 'C-B', {column: 1});
-    assertEdge('C to B edge', node1, edgesC[0], {
-      fromRow: 0,
-      toRow: 1,
-      fromColumn: 0,
-      toColumn: 0,
-    });
-    assertEdge('C to A edge', node1, edgesC[1], {
-      fromRow: 0,
-      toRow: 2,
-      fromColumn: 0,
-      toColumn: 0,
-    });
+    assertPath('Second Path', path2, 'C-B', {column: 1});
   },
 
   async function testTDB() {
@@ -109,8 +86,6 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('TBD', commitsAndRefs);
-    const { commits, paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
-    const [commitD, commitC, commitB, commitA] = commits;
   },
 
   async function testTBD() {
@@ -122,8 +97,6 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('TBD', commitsAndRefs);
-    const { commits, paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
-    const [commitD, commitC, commitB, commitA] = commits;
   },
 
   async function testTBD() {
@@ -135,8 +108,6 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('TBD', commitsAndRefs);
-    const { commits, paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
-    const [commitD, commitC, commitB, commitA] = commits;
   },
 
   async function testTBD() {
@@ -148,8 +119,6 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('TBD', commitsAndRefs);
-    const { commits, paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
-    const [commitD, commitC, commitB, commitA] = commits;
   },
 
   async function testMergeHasOwnColumnAscendingPriority() {
@@ -161,29 +130,16 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Merge has own column, ascending priority', commitsAndRefs);
-    const { paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
-    const path1 = paths[0];
-    const path2 = paths[1];
-    const edgesD = edgesForCommitId['D'];
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
     assertPath('First path', path1, 'C-B-A', {column: 0});
     assertPath('Second path', path2, 'D', {column: 2});
-    assertEdge('D to A edge', path2.nodes[0], edgesD[0], {
-      fromRow: 0,
-      toRow: 3,
-      fromColumn: 2,
-      toColumn: 0,
-      midRow: 3,
-      midColumn: 2,
-    });
-    assertEdge('D to B edge', path2.nodes[0], edgesD[1], {
-      fromRow: 0,
-      toRow: 2,
-      fromColumn: 2,
-      toColumn: 0,
-      midRow: 0,
-      midColumn: 1,
-      secondMidColumn: 1,
-      secondMidRow: 2,
+    assertEdges(renderData, {
+      from: { commitId: 'D', row: 0, column: 2 },
+      to: [
+        { commitId: 'A', row: 3, column: 0, midRow: 3, midColumn: 2 },
+        { commitId: 'B', row: 2, column: 0, midRow: 0, midColumn: 1, secondMidColumn: 1, secondMidRow: 2 },
+      ],
     });
   },
 
@@ -196,29 +152,16 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Merge has own column, ascending priority, parents swapped', commitsAndRefs);
-    const { paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
-    const path1 = paths[0];
-    const path2 = paths[1];
-    const edgesD = edgesForCommitId['D'];
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
     assertPath('First path', path1, 'C-B-A', {column: 0});
     assertPath('Second path', path2, 'D', {column: 2});
-    assertEdge('D to B edge', path2.nodes[0], edgesD[0], {
-      fromRow: 0,
-      toRow: 2,
-      fromColumn: 2,
-      toColumn: 0,
-      midRow: 2,
-      midColumn: 2,
-    });
-    assertEdge('D to A edge', path2.nodes[0], edgesD[1], {
-      fromRow: 0,
-      toRow: 3,
-      fromColumn: 2,
-      toColumn: 0,
-      midRow: 0,
-      midColumn: 1,
-      secondMidColumn: 1,
-      secondMidRow: 3,
+    assertEdges(renderData, {
+      from: { commitId: 'D', row: 0, column: 2 },
+      to: [
+        { commitId: 'B', row: 2, column: 0, midRow: 2, midColumn: 2 },
+        { commitId: 'A', row: 3, column: 0, midRow: 0, midColumn: 1, secondMidColumn: 1, secondMidRow: 3 },
+      ],
     });
   },
 
@@ -231,9 +174,6 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Merge has own column, descending priority', commitsAndRefs);
-    const { commits, paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
-    const [commitD, commitC, commitB, commitA] = commits;
-    const path1 = paths[0];
   },
 
   async function testCrissCrossMerge() {
@@ -246,43 +186,23 @@ export default [
       [new Commit({ id: 'A' }), ''],
     ];
     renderGraph('Criss-cross merge', commitsAndRefs);
-
-    const { paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
-    const path1 = paths[0];
-    const path2 = paths[1];
-    const edgesM1 = edgesForCommitId['M1'];
-    const edgesM2 = edgesForCommitId['M2'];
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
     assertPath('First path', path1, 'M1-B-A', {column: 0});
     assertPath('Second path', path2, 'M2-F', {column: 2});
-    assertEdge('M1 to B edge', path1.nodes[0], edgesM1[0], {
-      fromRow: 1,
-      toRow: 3,
-      fromColumn: 0,
-      toColumn: 0,
+    assertEdges(renderData, {
+      from: { commitId: 'M1', row: 1, column: 0 },
+      to: [
+        { commitId: 'B', row: 3, column: 0 },
+        { commitId: 'F', row: 2, column: 2, midRow: 1, midColumn: 2 },
+      ],
     });
-    assertEdge('M1 to F edge', path1.nodes[0], edgesM1[1], {
-      fromRow: 1,
-      toRow: 2,
-      fromColumn: 0,
-      toColumn: 2,
-      midRow: 1,
-      midColumn: 2,
-    });
-    assertEdge('M2 to F edge', path2.nodes[0], edgesM2[0], {
-      fromRow: 0,
-      toRow: 2,
-      fromColumn: 2,
-      toColumn: 2,
-    });
-    assertEdge('M2 to B edge', path2.nodes[0], edgesM2[1], {
-      fromRow: 0,
-      toRow: 3,
-      fromColumn: 2,
-      toColumn: 0,
-      midRow: 0,
-      midColumn: 1,
-      secondMidRow: 3,
-      secondMidColumn: 1,
+    assertEdges(renderData, {
+      from: { commitId: 'M2', row: 0, column: 2 },
+      to: [
+        { commitId: 'F', row: 2, column: 2 },
+        { commitId: 'B', row: 3, column: 0, midRow: 0, midColumn: 1, secondMidRow: 3, secondMidColumn: 1 },
+      ],
     });
   },
 
@@ -296,8 +216,6 @@ export default [
       [new Commit({ id: 'A' }), ''],
     ];
     renderGraph('Criss-cross merge, different order', commitsAndRefs);
-
-    const { paths, edgesForCommitId } = await getRenderData(commitsAndRefs);
     // TODO: It's the bug again.
   },
 
@@ -311,9 +229,10 @@ export default [
       [new Commit({id: 'A'}), '(refs/heads/main)'],
     ];
     renderGraph('Branch priority', commitsAndRefs);
-    const { paths } = await getRenderData(commitsAndRefs);
-    assertPath('First Path', paths[0], 'A', {column: 0});
-    assertPath('Second Path', paths[1], 'B', {column: 1});
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
+    assertPath('First Path', path1, 'A', {column: 0});
+    assertPath('Second Path', path2, 'B', {column: 1});
   },
 
   async function testBranchPriorityInBetweenNamedBranches() {
@@ -325,11 +244,12 @@ export default [
       [new Commit({id: 'A'}), '(refs/heads/main)'],
     ];
     renderGraph('Branch priority in between named branches', commitsAndRefs);
-    const { paths } = await getRenderData(commitsAndRefs);
-    assertPath('First Path', paths[0], 'A', {column: 0});
-    assertPath('Second Path', paths[1], 'B', {column: 1});
-    assertPath('Third Path', paths[2], 'C', {column: 2});
-    assertPath('Fourth Path', paths[3], 'D', {column: 3});
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3, path4] = renderData.paths;
+    assertPath('First Path', path1, 'A', {column: 0});
+    assertPath('Second Path', path2, 'B', {column: 1});
+    assertPath('Third Path', path3, 'C', {column: 2});
+    assertPath('Fourth Path', path4, 'D', {column: 3});
   },
 
   async function testBranchPriorityInBetweenNamedBranchesDifferentOrder() {
@@ -341,11 +261,12 @@ export default [
       [new Commit({id: 'A'}), '(refs/heads/main)'],
     ];
     renderGraph('Branch priority in between named branches, different order', commitsAndRefs);
-    const { paths } = await getRenderData(commitsAndRefs);
-    assertPath('First Path', paths[0], 'A', {column: 0});
-    assertPath('Second Path', paths[1], 'C', {column: 1});
-    assertPath('Third Path', paths[2], 'B', {column: 2});
-    assertPath('Fourth Path', paths[3], 'D', {column: 3});
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3, path4] = renderData.paths;
+    assertPath('First Path', path1, 'A', {column: 0});
+    assertPath('Second Path', path2, 'C', {column: 1});
+    assertPath('Third Path', path3, 'B', {column: 2});
+    assertPath('Fourth Path', path4, 'D', {column: 3});
   },
 
   async function testBranchPriorityOpenBranches() {
@@ -357,10 +278,11 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Branch priority open branches', commitsAndRefs);
-    const { paths } = await getRenderData(commitsAndRefs);
-    assertPath('First Path', paths[0], 'D-A', {column: 0});
-    assertPath('Second Path', paths[1], 'C', {column: 1});
-    assertPath('Third Path', paths[2], 'B', {column: 2});
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'D-A', {column: 0});
+    assertPath('Second Path', path2, 'C', {column: 1});
+    assertPath('Third Path', path3, 'B', {column: 2});
   },
 
   async function testBranchPriorityOpenBranchesWithNamedBranch() {
@@ -372,10 +294,11 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Branch priority open branches, with named branch', commitsAndRefs);
-    const { paths } = await getRenderData(commitsAndRefs);
-    assertPath('First Path', paths[0], 'B-A', {column: 0});
-    assertPath('Second Path', paths[1], 'D', {column: 1});
-    assertPath('Third Path', paths[2], 'C', {column: 2});
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'B-A', {column: 0});
+    assertPath('Second Path', path2, 'D', {column: 1});
+    assertPath('Third Path', path3, 'C', {column: 2});
   },
 
   async function testBranchPriorityOpenBranchesWithMerge() {
@@ -387,10 +310,11 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Branch priority open branches, with named branch', commitsAndRefs);
-    const { paths } = await getRenderData(commitsAndRefs);
-    assertPath('First Path', paths[0], 'C-A', {column: 0});
-    assertPath('Second Path', paths[1], 'B', {column: 1});
-    assertPath('Third Path', paths[2], 'D', {column: 2});
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'C-A', {column: 0});
+    assertPath('Second Path', path2, 'B', {column: 1});
+    assertPath('Third Path', path3, 'D', {column: 2});
   },
 
   async function testBranchPriorityNestedMerges() {
@@ -403,10 +327,11 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Branch priority nested merges', commitsAndRefs);
-    const { paths } = await getRenderData(commitsAndRefs);
-    assertPath('First Path', paths[0], 'E-D-A', {column: 0});
-    assertPath('Second Path', paths[1], 'B', {column: 1});
-    assertPath('Third Path', paths[2], 'C', {column: 2});
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'E-D-A', {column: 0});
+    assertPath('Second Path', path2, 'B', {column: 1});
+    assertPath('Third Path', path3, 'C', {column: 2});
   },
 
   async function testBranchPriorityNestedMergesDifferentOrder() {
@@ -419,9 +344,10 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Branch priority nested merges, different order', commitsAndRefs);
-    const { paths } = await getRenderData(commitsAndRefs);
-    assertPath('First Path', paths[0], 'E-D-A', {column: 0});
-    assertPath('Second Path', paths[1], 'C', {column: 1});
-    assertPath('Third Path', paths[2], 'B', {column: 2});
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'E-D-A', {column: 0});
+    assertPath('Second Path', path2, 'C', {column: 1});
+    assertPath('Third Path', path3, 'B', {column: 2});
   },
 ];

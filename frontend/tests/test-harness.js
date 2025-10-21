@@ -1,4 +1,4 @@
-import { parseRefsFromDecorateFull } from '../js/git-interface/parsers.js';
+import { parseBranchNamesFromSubject, parseRefsFromDecorateFull } from '../js/git-interface/parsers.js';
 import Commit from '../js/models/commit.js';
 import Reference from '../js/models/reference.js';
 import { getEdges } from '../js/ui/graph-functions.js';
@@ -22,16 +22,16 @@ function getCommitsAndParseRefs(commitsAndRefs) {
 }
 
 /**
+ * @typedef {Object} GraphRenderData
+ * @property {Commit[]} commits
+ * @property {Path[]} paths
+ * @property {Map<string, Node>} nodeForCommitId
+ * @property {Partial<{[commitId: string]: EdgeContext[]}>} edgesForCommitId
+ */
+/**
  * Prepare render data for the given commits and reference decorations.
  * @param {[Commit, string][]} commitsAndRefs An array of tuples containing Commit objects and their associated reference decoration strings.
- * @return {Promise<{
- *   commits: Commit[],
- *   paths: Path[],
- *   nodeForCommitId: Map<string, Node>,
- *   edgesForCommitId: Partial<{
- *     [commitId: string]: EdgeContext[]
- *   }>
- * }>}
+ * @returns {Promise<GraphRenderData>}
  */
 export async function getRenderData(commitsAndRefs) {
   const testColors = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'];
@@ -105,8 +105,8 @@ export function assert(condition, message) {
  * @param {EdgeContext} edge The points of the edge to test.
  * @param {Object} expected The expected values for the edge.
  * @param {number} expected.fromRow The expected starting row of the edge.
- * @param {number} expected.toRow The expected ending row of the edge.
  * @param {number} expected.fromColumn The expected starting column of the edge.
+ * @param {number} expected.toRow The expected ending row of the edge.
  * @param {number} expected.toColumn The expected ending column of the edge.
  * @param {number} [expected.midRow] The expected mid-point row of the edge, if any.
  * @param {number} [expected.midColumn] The expected mid-point column of the edge, if any.
@@ -133,20 +133,60 @@ export function assertEdge(description, node, edge, expected) {
   assert(endRow === expected.toRow, `${description || 'Edge'} should end at row ${expected.toRow}. Actual: ${endRow}`);
   assert(endColumn === expected.toColumn, `${description || 'Edge'} should end at column ${expected.toColumn}. Actual: ${endColumn}`);
   if (midPointRow !== undefined) {
-    assert(expected.midRow !== undefined, `${description || 'Edge'}: Unexpected mid-point in edgePoints (row:${midPointRow}, col:${midPointColumn}).`);
+    assert(expected.midRow !== undefined, `${description || 'Edge'}: Unexpected mid-point (row:${midPointRow}, col:${midPointColumn}).`);
     assert(midPointRow === expected.midRow, `${description || 'Edge'} mid-point should be at row ${expected.midRow}. Actual: ${midPointRow}`);
     assert(midPointColumn === expected.midColumn, `${description || 'Edge'} mid-point should be at column ${expected.midColumn}. Actual: ${midPointColumn}`);
   } else {
     assert(expected.midRow === undefined && expected.midColumn === undefined, `${description || 'Edge'}: Expected mid-point to be defined, but it was not.`);
   }
   if (secondMidPointRow !== undefined) {
-    assert(expected.secondMidRow !== undefined, `${description || 'Edge'}: Unexpected second mid-point in edgePoints (row:${secondMidPointRow}, col:${secondMidPointColumn}).`);
+    assert(expected.secondMidRow !== undefined, `${description || 'Edge'}: Unexpected second mid-point (row:${secondMidPointRow}, col:${secondMidPointColumn}).`);
     assert(secondMidPointRow === expected.secondMidRow, `${description || 'Edge'} second mid-point should be at row ${expected.secondMidRow}. Actual: ${secondMidPointRow}`);
     assert(secondMidPointColumn === expected.secondMidColumn, `${description || 'Edge'} second mid-point should be at column ${expected.secondMidColumn}. Actual: ${secondMidPointColumn}`);
   } else {
     assert(expected.secondMidRow === undefined && expected.secondMidColumn === undefined, `${description || 'Edge'}: Expected second mid-point to be undefined, but it was not.`);
   }
 };
+
+/**
+ * @typedef {object} EdgeFrom
+ * @property {string} commitId Expected start commit ID.
+ * @property {number} row
+ * @property {number} column
+ */
+/**
+ * @typedef {object} EdgeTo
+ * @property {string} commitId Expected end commit ID.
+ * @property {number} row
+ * @property {number} column
+ * @property {number} [midRow]
+ * @property {number} [midColumn]
+ * @property {number} [secondMidRow]
+ * @property {number} [secondMidColumn]
+ */
+/**
+ * Assert that all edges from the expected start node match the expected end and mid points.
+ * @param {GraphRenderData} renderData
+ * @param {{ from: EdgeFrom, to: EdgeTo[] }} expected
+ */
+export function assertEdges(renderData, expected) {
+  const node = renderData.nodeForCommitId.get(expected.from.commitId);
+  const edges = renderData.edgesForCommitId[expected.from.commitId];
+  for (const [index, edge] of edges.entries()) {
+    const expectedTo = expected.to[index];
+    const parentId = node.commit.parents[index];
+    assertEdge(`${node.commit.id} to ${parentId} edge`, node, edge, {
+      fromRow: expected.from.row,
+      fromColumn: expected.from.column,
+      toRow: expectedTo.row,
+      toColumn: expectedTo.column,
+      midRow: expectedTo.midRow,
+      midColumn: expectedTo.midColumn,
+      secondMidRow: expectedTo.secondMidRow,
+      secondMidColumn: expectedTo.secondMidColumn,
+    });
+  }
+}
 
 /** @param {string[]} commitIds */
 function formatCommitIds(commitIds) {
@@ -167,7 +207,7 @@ function formatPath(path) {
  * @param {string} description A description of the path being tested, for debugging purposes.
  * @param {Path} path The path to test.
  * @param {string[]|string} expectedCommitIds The expected commit IDs in order.
- * @param {object} [options] Additional options for the assertion.
+ * @param {Object} [options] Additional options for the assertion.
  * @param {number} [options.column] The expected column index of the path.
  */
 export function assertPath(description, path, expectedCommitIds, { column: expectedColumnIndex } = {}) {
