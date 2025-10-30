@@ -68,9 +68,13 @@ function isCommitInRange(commitContext, minRow, maxRow) {
 
 
 export class GraphElement extends HTMLElement {
+  static uniqueIdCounter = 0;
+
   constructor() {
     super();
     const graph = this;
+    // Unique ID for each graph instance, for example used to avoid ID conflicts in SVG markers.
+    graph.uniqueId = `graph-${GraphElement.uniqueIdCounter++}`;
     graph.appendChild(graphTemplate.content.cloneNode(true));
     /** @type {HTMLElement} */
     graph.commitsContainer = graph.querySelector('.commits');
@@ -421,6 +425,7 @@ export class GraphElement extends HTMLElement {
    * @param {CommitContext} [oldContext]
    */
   updateCommitElement(commitElement, context, oldContext) {
+    const graph = this;
     const graphThicknessBase = 32;
     // Remove `display: none;` because new and reused commit elements are initially hidden.
     commitElement.style.removeProperty('display');
@@ -451,7 +456,7 @@ export class GraphElement extends HTMLElement {
         // Edge needs its own color, because a node may have multiple different color edges starting from it.
         edgeElement.style.setProperty('--color', edge.strokeColor);
         if (index > 0) {
-          const markerId = `arrow-marker-${context.commit.id}-${index}`;
+          const markerId = `arrow-marker-${graph.uniqueId}-${context.commit.id}-${index}`;
           commitElement._elems.arrowMarker.setAttribute('id', markerId);
           commitElement._elems.arrowMarker.setAttribute('fill', edge.strokeColor);
           commitElement._elems.arrowMarker.setAttribute('markerWidth', (graphThicknessBase / 10).toString());
