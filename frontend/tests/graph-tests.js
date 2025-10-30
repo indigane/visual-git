@@ -240,6 +240,20 @@ export default [
     assertPath('Second Path', path2, 'B', {column: 1});
   },
 
+  async function testSimpleBranchPriorityDifferentOrder() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'C', parents: ['A']}), '(refs/heads/main)'],
+      [new Commit({id: 'B', parents: ['A']}), '(refs/heads/develop)'],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Branch priority, different order', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
+    assertPath('First Path', path1, 'C-A', {column: 0});
+    assertPath('Second Path', path2, 'B', {column: 1});
+  },
+
   async function testBranchPriorityInBetweenNamedBranches() {
     /** @type {[Commit, string][]} */
     const commitsAndRefs = [
@@ -320,6 +334,57 @@ export default [
     assertPath('First Path', path1, 'C-A', {column: 0});
     assertPath('Second Path', path2, 'B', {column: 1});
     assertPath('Third Path', path3, 'D', {column: 2});
+  },
+
+  async function testBranchPriorityOpenBranchesLongerPathD() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'E', parents: ['D']}), ''],
+      [new Commit({id: 'D', parents: ['A']}), ''],
+      [new Commit({id: 'C', parents: ['A']}), ''],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Branch priority open branches, longer path on D', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'E-D-A', {column: 0});
+    assertPath('Second Path', path2, 'C', {column: 1});
+    assertPath('Third Path', path3, 'B', {column: 2});
+  },
+
+  async function testBranchPriorityOpenBranchesLongerPathC() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'E', parents: ['C']}), ''],
+      [new Commit({id: 'D', parents: ['A']}), ''],
+      [new Commit({id: 'C', parents: ['A']}), ''],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Branch priority open branches, longer path on C', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'E-C-A', {column: 0});
+    assertPath('Second Path', path2, 'D', {column: 1});
+    assertPath('Third Path', path3, 'B', {column: 2});
+  },
+
+  async function testBranchPriorityOpenBranchesLongerPathB() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'E', parents: ['B']}), ''],
+      [new Commit({id: 'D', parents: ['A']}), ''],
+      [new Commit({id: 'C', parents: ['A']}), ''],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Branch priority open branches, longer path on B', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'E-B-A', {column: 0});
+    assertPath('Second Path', path2, 'D', {column: 1});
+    assertPath('Third Path', path3, 'C', {column: 2});
   },
 
   async function testBranchPriorityOpenBranchWithMergeDifferentOrder() {
