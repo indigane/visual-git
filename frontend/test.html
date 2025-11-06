@@ -12,6 +12,7 @@
     <div class="tests"></div>
     <script async src="js/ui/svg-icon.js"></script>
     <script type="module">
+      const testsContainer = document.querySelector('.tests');
       const testPaths = [
         './tests/graph-tests.js',
       ];
@@ -23,6 +24,7 @@
             console.info(`%cTest passed: ${testPath}::${testFunction.name}`, 'color: #0f0;');
           } catch (error) {
             console.error(`Test failed: ${testPath}::${testFunction.name}\n\n`, error);
+            testsContainer.querySelector('h2:last-of-type').classList.add('failed');
           }
         }
       }

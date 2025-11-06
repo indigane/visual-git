@@ -1,5 +1,5 @@
 import Commit from '../js/models/commit.js';
-import { assert, assertEdge, assertEdges, assertPath, assertPathColumn, getRenderData, renderGraph } from './test-harness.js';
+import { assertEdges, assertPath, getRenderData, renderGraph } from './test-harness.js';
 /** @typedef {import('../js/ui/graph-models.js').EdgeContext} EdgeContext */
 
 export default [
