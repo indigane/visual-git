@@ -265,14 +265,37 @@ export function assignPathColumns(paths, options) {
             continue;
           }
           const range = {start: node.row, end: parentNode.row};
-          while (getIsOverlappingOccupiedRange(column, range.start, range.end)) {
-            column = getNextColumn(columnIterator);
-          }
-          column.occupiedRanges.push(range);
           const parentIndex = node.parents.indexOf(parentNode);
-          nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = column.columnIndex;
-          while ( ! getIsColumnValidForPath(column, pathStart, pathEnd)) {
-            column = getNextColumn(columnIterator);
+          // Check if the columns between the parent path's column and the current column have room for the merge edge
+          let existingColumnIndex;
+          let wasExistingColumnOccupied = false;
+          for (
+            existingColumnIndex = parentNode.path.columnIndex + 1 ?? 0;
+            existingColumnIndex < column.columnIndex;
+            existingColumnIndex += 1
+          ) {
+            const existingColumn = columns[existingColumnIndex];
+            const isOverlapping = getIsOverlappingOccupiedRange(existingColumn, range.start, range.end);
+            if ( ! isOverlapping) {
+              column.occupiedRanges.push(range);
+              nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = existingColumn.columnIndex;
+              wasExistingColumnOccupied = true;
+            }
+          }
+          // Otherwise get the next unoccupied column
+          if ( ! wasExistingColumnOccupied) {
+            let mergeEdgeColumn = column;
+            while (getIsOverlappingOccupiedRange(mergeEdgeColumn, range.start, range.end)) {
+              mergeEdgeColumn = getNextColumn(columnIterator);
+            }
+            mergeEdgeColumn.occupiedRanges.push(range);
+            nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = mergeEdgeColumn.columnIndex;
+            if (mergeEdgeColumn.columnIndex === column.columnIndex) {
+              // Since we occupied the current path's would-be column, give the path a new column
+              while ( ! getIsColumnValidForPath(column, pathStart, pathEnd)) {
+                column = getNextColumn(columnIterator);
+              }
+            }
           }
         }
       }
