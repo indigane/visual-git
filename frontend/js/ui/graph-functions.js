@@ -257,45 +257,52 @@ export function assignPathColumns(paths, options) {
           if ( ! edgeWouldOverlapNodes) {
             continue;
           }
-          const parentHasPriority = comparePaths(parentNode.path, path) < 0;
-          if ( ! parentHasPriority) {
-            continue;
-          }
           if (parentNode.isPlaceholder && options.shouldHideIndeterminateMergeEdges) {
             continue;
           }
           const range = {start: node.row, end: parentNode.row};
           const parentIndex = node.parents.indexOf(parentNode);
-          // Check if the columns between the parent path's column and the current column have room for the merge edge
-          let existingColumnIndex;
-          let wasExistingColumnOccupied = false;
-          for (
-            existingColumnIndex = parentNode.path.columnIndex + 1 ?? 0;
-            existingColumnIndex < column.columnIndex;
-            existingColumnIndex += 1
-          ) {
-            const existingColumn = columns[existingColumnIndex];
-            const isOverlapping = getIsOverlappingOccupiedRange(existingColumn, range.start, range.end);
-            if ( ! isOverlapping) {
-              column.occupiedRanges.push(range);
-              nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = existingColumn.columnIndex;
-              wasExistingColumnOccupied = true;
+          const parentPathHasPriority = comparePaths(parentNode.path, path) < 0;
+          if (parentPathHasPriority) {
+            // Check if the columns between the parent path's column and the current column have room for the merge edge
+            let existingColumnIndex;
+            let wasExistingColumnOccupied = false;
+            for (
+              existingColumnIndex = (parentNode.path.columnIndex ?? -1) + 1;
+              existingColumnIndex < column.columnIndex;
+              existingColumnIndex += 1
+            ) {
+              const existingColumn = columns[existingColumnIndex];
+              const isOverlapping = getIsOverlappingOccupiedRange(existingColumn, range.start, range.end);
+              if ( ! isOverlapping) {
+                column.occupiedRanges.push(range);
+                nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = existingColumn.columnIndex;
+                wasExistingColumnOccupied = true;
+              }
+            }
+            // Otherwise get the next unoccupied column
+            if ( ! wasExistingColumnOccupied) {
+              let mergeEdgeColumn = column;
+              while (getIsOverlappingOccupiedRange(mergeEdgeColumn, range.start, range.end)) {
+                mergeEdgeColumn = getNextColumn(columnIterator);
+              }
+              mergeEdgeColumn.occupiedRanges.push(range);
+              nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = mergeEdgeColumn.columnIndex;
+              if (mergeEdgeColumn.columnIndex === column.columnIndex) {
+                // Since we occupied the current path's would-be column, give the path a new column
+                while ( ! getIsColumnValidForPath(column, pathStart, pathEnd)) {
+                  column = getNextColumn(columnIterator);
+                }
+              }
             }
           }
-          // Otherwise get the next unoccupied column
-          if ( ! wasExistingColumnOccupied) {
-            let mergeEdgeColumn = column;
+          else {
+            let mergeEdgeColumn = createColumn();
             while (getIsOverlappingOccupiedRange(mergeEdgeColumn, range.start, range.end)) {
-              mergeEdgeColumn = getNextColumn(columnIterator);
+              mergeEdgeColumn = createColumn();
             }
             mergeEdgeColumn.occupiedRanges.push(range);
             nodelessPathColumnIndices[`${node.row}-${parentIndex}`] = mergeEdgeColumn.columnIndex;
-            if (mergeEdgeColumn.columnIndex === column.columnIndex) {
-              // Since we occupied the current path's would-be column, give the path a new column
-              while ( ! getIsColumnValidForPath(column, pathStart, pathEnd)) {
-                column = getNextColumn(columnIterator);
-              }
-            }
           }
         }
       }
@@ -329,16 +336,23 @@ export function assignPathColumns(paths, options) {
       let nextColumn;
       const next = columnIterator.next();
       if (next.done) {
-        nextColumn = {
-          columnIndex: columns.length,
-          occupiedRanges: [],
-        };
-        columns.push(nextColumn);
+        nextColumn = createColumn();
       }
       else {
         nextColumn = next.value;
       }
       return nextColumn;
+    };
+
+    /** @returns {Column} */
+    const createColumn = function() {
+      /** @type {Column} */
+      const column = {
+        columnIndex: columns.length,
+        occupiedRanges: [],
+      };
+      columns.push(column);
+      return column;
     };
 
     /**
@@ -605,9 +619,8 @@ export function getEdges(context, options) {
       edgePoints.push([endX * columnWidth + xOffset, endY * rowHeight + yOffset]);
       strokeColor = colors[node.path.columnIndex % colors.length];
     }
-    else if (parentHasPriority && edgeHasOwnColumn) {
-      // Edge is diverging from top right to bottom left. Draw a line with a corner.
-      // From a high priority path to a low priority path. For example merge main to develop.
+    else if (edgeHasOwnColumn) {
+      // Edge has its own column. Draw a line with two corners.
       const startX = node.path.columnIndex;
       const startY = 0;
       edgePoints.push([startX * columnWidth + xOffset, startY * rowHeight + yOffset]);

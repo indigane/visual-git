@@ -120,6 +120,7 @@ export default [
       [new Commit({id: 'A'}), ''],
     ];
     renderGraph('Merge has own column, descending priority', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
   },
 
   async function testMergeHasOwnColumnWithOpenBranch() {
