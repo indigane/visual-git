@@ -1,5 +1,5 @@
 import Commit from '../js/models/commit.js';
-import { assertEdges, assertPath, getRenderData, renderGraph } from './test-harness.js';
+import { assert, assertEdges, assertPath, getRenderData, renderGraph } from './test-harness.js';
 /** @typedef {import('../js/ui/graph-models.js').EdgeContext} EdgeContext */
 
 export default [
@@ -32,6 +32,37 @@ export default [
     });
   },
 
+  async function testIndeterminateEdge() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'B', parents: ['A']}), '(HEAD -> refs/heads/main)'],
+    ];
+    renderGraph('Indeterminate edge', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1] = renderData.paths;
+    assertPath('First Path', path1, 'B', {column: 0});
+    assertEdges(renderData, {
+      from: { commitId: 'B', row: 0, column: 0 },
+      to: [
+        { commitId: 'A', row: 1, column: 0 },
+      ],
+    });
+  },
+
+  async function testTwoRootCommits() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'B'}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Two root commits', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
+    assertPath('First Path', path1, 'B', {column: 0});
+    // TODO: Is this correct or should these be in the same column? Why are these in different columns?
+    assertPath('First Path', path2, 'A', {column: 1});
+  },
+
   async function testSimpleMerge() {
     /** @type {[Commit, string][]} */
     const commitsAndRefs = [
@@ -49,6 +80,52 @@ export default [
       to: [
         { commitId: 'A', row: 2, column: 0 },
         { commitId: 'B', row: 1, column: 1, midRow: 0, midColumn: 1 },
+      ],
+    });
+  },
+
+  async function testSimpleMergeIndeterminateSecondParent() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'C', parents: ['A', 'B']}), '(refs/heads/main)'],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Simple merge, indeterminate second parent', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1] = renderData.paths;
+    assertPath('First Path', path1, 'C-A', {column: 0});
+    assertEdges(renderData, {
+      from: { commitId: 'C', row: 0, column: 0 },
+      to: [
+        { commitId: 'A', row: 1, column: 0 },
+        // TODO: Why is this col 2? Shouldn't it be 1?
+        { commitId: 'B', row: 2, column: 2, midRow: 0, midColumn: 2 },
+      ],
+    });
+  },
+
+  async function testSimpleMergeIndeterminateFirstParent() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'C', parents: ['A', 'B']}), '(refs/heads/main)'],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+    ];
+    renderGraph('Simple merge, indeterminate first parent', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
+    assertPath('First Path', path1, 'C', {column: 0});
+    assertPath('Second Path', path2, 'B', {column: 1});
+    assertEdges(renderData, {
+      from: { commitId: 'C', row: 0, column: 0 },
+      to: [
+        { commitId: 'A', row: 2, column: 0 },
+        { commitId: 'B', row: 1, column: 1, midRow: 0, midColumn: 1 },
+      ],
+    });
+    assertEdges(renderData, {
+      from: { commitId: 'B', row: 1, column: 1 },
+      to: [
+        { commitId: 'A', row: 2, column: 1 },
       ],
     });
   },
@@ -107,6 +184,16 @@ export default [
     ];
     renderGraph('Merge has own column, descending priority', commitsAndRefs);
     const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
+    assertPath('First path', path1, 'D-A', {column: 0});
+    assertPath('Second path', path2, 'C-B', {column: 2});
+    assertEdges(renderData, {
+      from: { commitId: 'D', row: 0, column: 0 },
+      to: [
+        { commitId: 'A', row: 3, column: 0 },
+        { commitId: 'B', row: 2, column: 2, midRow: 0, midColumn: 1, secondMidRow: 2, secondMidColumn: 1 },
+      ],
+    });
   },
 
   async function testMergeHasOwnColumnWithOpenBranch() {
@@ -121,12 +208,42 @@ export default [
     renderGraph('Merge has own column, with open branch in same column', commitsAndRefs);
     const renderData = await getRenderData(commitsAndRefs);
     const [path1, path2, path3] = renderData.paths;
-
     assertPath('First path', path1, 'D-C-A', {column: 0});
     assertPath('Second path', path2, 'B', {column: 1});
     assertPath('Third path', path3, 'E', {column: 2});
+    assertEdges(renderData, {
+      from: { commitId: 'E', row: 0, column: 2 },
+      to: [
+        { commitId: 'A', row: 4, column: 0, midRow: 4, midColumn: 2 },
+        { commitId: 'C', row: 2, column: 0, midRow: 0, midColumn: 1, secondMidRow: 2, secondMidColumn: 1 },
+      ],
+    });
+  },
 
-    // TODO: Assert edges when the third path assertion passes.
+  async function testMergeHasOwnColumnWithTwoOpenBranches() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'E', parents: ['A', 'C']}), '(refs/heads/develop)'],
+      [new Commit({id: 'D', parents: ['C']}), '(refs/heads/main)'],
+      [new Commit({id: 'C', parents: ['A']}), ''],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'B2', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Merge has own column, with two open branches', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3, path4] = renderData.paths;
+    assertPath('First path', path1, 'D-C-A', {column: 0});
+    assertPath('Second path', path2, 'B', {column: 1});
+    assertPath('Third path', path3, 'B2', {column: 2});
+    assertPath('Fourth path', path4, 'E', {column: 3});
+    assertEdges(renderData, {
+      from: { commitId: 'E', row: 0, column: 3 },
+      to: [
+        { commitId: 'A', row: 5, column: 0, midRow: 5, midColumn: 3 },
+        { commitId: 'C', row: 2, column: 0, midRow: 0, midColumn: 2, secondMidRow: 2, secondMidColumn: 2 },
+      ],
+    });
   },
 
   async function testMergeHasOwnColumnWithOpenBranchDifferentDirection() {
@@ -141,7 +258,6 @@ export default [
     renderGraph('Merge has own column, with open branch in same column, different direction', commitsAndRefs);
     const renderData = await getRenderData(commitsAndRefs);
     const [path1, path2, path3] = renderData.paths;
-
     assertPath('First path', path1, 'E-A', {column: 0});
     assertPath('Second path', path2, 'B', {column: 1});
     assertPath('Third path', path3, 'D-C', {column: 2});
@@ -150,6 +266,32 @@ export default [
       to: [
         { commitId: 'A', row: 4, column: 0 },
         { commitId: 'C', row: 2, column: 2, midRow: 0, midColumn: 1, secondMidRow: 2, secondMidColumn: 1 },
+      ],
+    });
+  },
+
+  async function testMergeHasOwnColumnWithTwoOpenBranchesDifferentDirection() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'E', parents: ['A', 'C']}), '(refs/heads/main)'],
+      [new Commit({id: 'D', parents: ['C']}), '(refs/heads/develop)'],
+      [new Commit({id: 'C', parents: ['A']}), ''],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'B2', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Merge has own column, with two open branches, different direction', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3, path4] = renderData.paths;
+    assertPath('First path', path1, 'E-A', {column: 0});
+    assertPath('Second path', path2, 'B', {column: 1});
+    assertPath('Third path', path3, 'B2', {column: 2});
+    assertPath('Fourth path', path4, 'D-C', {column: 3});
+    assertEdges(renderData, {
+      from: { commitId: 'E', row: 0, column: 0 },
+      to: [
+        { commitId: 'A', row: 5, column: 0 },
+        { commitId: 'C', row: 2, column: 3, midRow: 0, midColumn: 1, secondMidRow: 2, secondMidColumn: 1 },
       ],
     });
   },
@@ -194,7 +336,9 @@ export default [
       [new Commit({ id: 'A' }), ''],
     ];
     renderGraph('Criss-cross merge, symmetric, different order', commitsAndRefs);
-    // TODO: It's the bug again.
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2] = renderData.paths;
+    assertPath('First path', path1, 'M2-B-A', {column: 0});
   },
 
   async function testCrissCrossMergeChained() {
@@ -351,6 +495,56 @@ export default [
     assertPath('Fourth Path', path4, 'D', {column: 3});
   },
 
+  async function testBranchPriorityMultiplePriorityLevels() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'D', parents: ['A', 'C']}), '(refs/heads/main)'],
+      [new Commit({id: 'C', parents: ['A']}), '(refs/heads/develop)'],
+      [new Commit({id: 'B', parents: ['A']}), '(refs/heads/hotfix)'],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Branch priority, multiple priority levels', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'D-A', {column: 0});
+    assertPath('Second Path', path2, 'B', {column: 1});
+    assertPath('Third Path', path3, 'C', {column: 2});
+  },
+
+  async function testBranchPriorityMultiplePriorityLevelsIndeterminate() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'D', parents: ['A', 'C']}), '(refs/heads/main)'],
+      [new Commit({id: 'C', parents: ['A']}), '(refs/heads/develop)'],
+      [new Commit({id: 'B', parents: ['Z']}), '(refs/heads/hotfix)'],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Branch priority, multiple priority levels, indeterminate', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'D-A', {column: 0});
+    assertPath('Second Path', path2, 'B', {column: 1});
+    assertPath('Third Path', path3, 'C', {column: 2});
+    // TODO: Fix implementation.
+  },
+
+  async function testBranchPriorityMultiplePriorityLevelsWithAnotherRoot() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'D', parents: ['A', 'C']}), '(refs/heads/main)'],
+      [new Commit({id: 'C', parents: ['A']}), '(refs/heads/develop)'],
+      [new Commit({id: 'B'}), '(refs/heads/hotfix)'],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Branch priority, multiple priority levels, with root commit', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'D-A', {column: 0});
+    assertPath('Second Path', path2, 'B', {column: 1});
+    assertPath('Third Path', path3, 'C', {column: 2});
+    // TODO: Fix implementation.
+  },
+
   async function testBranchPriorityOpenBranches() {
     /** @type {[Commit, string][]} */
     const commitsAndRefs = [
@@ -450,6 +644,40 @@ export default [
     assertPath('Third Path', path3, 'C', {column: 2});
   },
 
+  async function testBranchPriorityOpenBranchesDifferentOrigin() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'E', parents: ['B']}), ''],
+      [new Commit({id: 'D', parents: ['B']}), ''],
+      [new Commit({id: 'C', parents: ['A']}), ''],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Branch priority open branches, different origin', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'E-B-A', {column: 0});
+    assertPath('Second Path', path2, 'D', {column: 1});
+    assertPath('Third Path', path3, 'C', {column: 2});
+  },
+
+  async function testBranchPriorityOpenBranchesDifferentOriginDifferentOrder() {
+    /** @type {[Commit, string][]} */
+    const commitsAndRefs = [
+      [new Commit({id: 'E', parents: ['B']}), ''],
+      [new Commit({id: 'D', parents: ['A']}), ''],
+      [new Commit({id: 'C', parents: ['B']}), ''],
+      [new Commit({id: 'B', parents: ['A']}), ''],
+      [new Commit({id: 'A'}), ''],
+    ];
+    renderGraph('Branch priority open branches, different origin, different order', commitsAndRefs);
+    const renderData = await getRenderData(commitsAndRefs);
+    const [path1, path2, path3] = renderData.paths;
+    assertPath('First Path', path1, 'E-B-A', {column: 0});
+    assertPath('Second Path', path2, 'D', {column: 1});
+    assertPath('Third Path', path3, 'C', {column: 2});
+  },
+
   async function testBranchPriorityOpenBranchWithMergeDifferentOrder() {
     /** @type {[Commit, string][]} */
     const commitsAndRefs = [
@@ -516,7 +744,7 @@ export default [
     assertPath('Third Path', path3, 'B', {column: 2});
   },
 
-  async function testTDB() {
+  async function testTBD() {
     /** @type {[Commit, string][]} */
     const commitsAndRefs = [
       [new Commit({id: 'C', parents: ['A', 'B']}), ''],
