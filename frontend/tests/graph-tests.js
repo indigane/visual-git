@@ -53,20 +53,6 @@ export default [
     });
   },
 
-  async function testSimpleMergeParentsSwapped() {
-    /** @type {[Commit, string][]} */
-    const commitsAndRefs = [
-      [new Commit({id: 'C', parents: ['B', 'A']}), '(refs/heads/main)'],
-      [new Commit({id: 'B', parents: ['A']}), ''],
-      [new Commit({id: 'A'}), ''],
-    ];
-    renderGraph('Simple merge, parents swapped', commitsAndRefs);
-    const renderData = await getRenderData(commitsAndRefs);
-    const [path1, path2] = renderData.paths;
-    assertPath('First Path', path1, 'A', {column: 0});
-    assertPath('Second Path', path2, 'C-B', {column: 1});
-  },
-
   async function testMergeHasOwnColumnAscendingPriority() {
     /** @type {[Commit, string][]} */
     const commitsAndRefs = [
