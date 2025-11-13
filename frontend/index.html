@@ -3,8 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <base href="/" />
     <title>Visual Git</title>
+    <script>
+      // For now redirect from `/github.com/owner/repo` to `/#github.com/owner/repo`
+      // as an alternative to a static `<base>` which will not work when the base path changes between environments.
+      if (window.location.pathname.includes('github.com')) {
+        const [baseUrl, otherPath] = window.location.href.split('github.com');
+        window.location.href = `${baseUrl}#github.com${otherPath}`;
+      }
+    </script>
     <link href="css/style.css" rel="stylesheet">
   </head>
   <body>
