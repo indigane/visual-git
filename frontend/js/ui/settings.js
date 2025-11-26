@@ -4,19 +4,23 @@ import { elementEvent } from '../utils.js';
 /**
  * @typedef {Object} Settings
  * @property {'currentBranch' | 'allRefs' | 'allRefsHistory'} commitVisibility
- * @property {number} maxCommits
+ * @property {number} local__commitPageSize
+ * @property {number} github__commitPageSize
  */
 
 /** @type {Settings} */
 const DEFAULT_SETTINGS = {
   'commitVisibility': 'allRefs',
-  'maxCommits': 1000,
+  'local__commitPageSize': 1000,
+  'github__commitPageSize': 200,
 };
 
 const validation = {
   'commitVisibility': ['currentBranch', 'allRefs', 'allRefsHistory'],
-  'maxCommits': Number.isInteger,
+  'local__commitPageSize': Number.isInteger,
+  'github__commitPageSize': Number.isInteger,
 };
+
 
 export class SettingsElement extends HTMLElement {
   constructor() {

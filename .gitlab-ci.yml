@@ -1,0 +1,14 @@
+image: busybox
+pages:
+  script:
+    # Redirect all non-matching paths to index.html
+    - echo "/* /index.html 200" > frontend/_redirects
+    # Set correct base path so that you can just append a repo URL to visual-git URL
+    - sed -i 's|<base href="/"|<base href="/visual-git/"|' frontend/index.html
+  artifacts:
+    paths:
+      - frontend
+  publish: frontend
+  rules:
+    # - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_REF_NAME == 'pages'

@@ -4,6 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Visual Git</title>
+    <script>
+      // For now redirect from `/github.com/owner/repo` to `/#github.com/owner/repo`
+      // as an alternative to a static `<base>` which will not work when the base path changes between environments.
+      if (window.location.pathname.includes('github.com')) {
+        const [baseUrl, otherPath] = window.location.href.split('github.com');
+        window.location.href = `${baseUrl}#github.com${otherPath}`;
+      }
+    </script>
     <link href="css/style.css" rel="stylesheet">
   </head>
   <body>
@@ -24,43 +32,7 @@
         </label>
       </div>
     </vg-settings>
-    <vg-graph class="graph-container">
-      <div class="commits"></div>
-      <div class="refs"></div>
-    </vg-graph>
-    <template id="commit-template">
-      <div class="commit" style="--transition-duration: 0s; display: none;">
-        <div class="graph">
-          <svg>
-            <defs>
-              <marker
-                class="arrow-marker"
-                viewBox="0 0 10 10"
-                refX="16"
-                refY="5"
-                markerWidth="6"
-                markerHeight="6"
-                orient="auto-start-reverse"
-              >
-                <path d="M 0 0 L 10 5 L 0 10 z" />
-              </marker>
-            </defs>
-            <circle></circle>
-            <path class="edge"></path>
-            <path class="edge"></path>
-          </svg>
-        </div>
-        <div class="metadata">
-          <div class="message-container">
-            <span class="message"></span>
-          </div>
-          <div class="identifier"></div>
-          <div class="author"></div>
-          <div class="timestamp"></div>
-        </div>
-        <div class="refs"></div>
-      </div>
-    </template>
+    <vg-graph class="graph-container"></vg-graph>
     <script async src="js/ui/svg-icon.js"></script>
     <script src="js/vendor/reconnecting-websocket.js"></script>
     <script src="js/main.js" type="module"></script>
