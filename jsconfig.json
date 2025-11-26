@@ -1,13 +1,14 @@
 {
   "compilerOptions": {
-    "module": "es2022",
+    "module": "esnext",
     "target": "es2022",
     "lib": ["es2022", "esnext", "dom", "dom.iterable"],
     "checkJs": true,
     "noEmit": true
   },
   "include": [
-    "./frontend/**/*.js"
+    "./frontend/**/*.js",
+    "./global.d.ts"
   ],
   "exclude": [
     "**/vendor/*.js"

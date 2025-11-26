@@ -18,12 +18,13 @@ import {
   sortPaths,
 } from '../graph-functions.js';
 import { requestIdlePromise } from '../../utils.js';
+import styleSheet from "./graph.css" with { type: "css" };
 /** @typedef {import('graph-models.js').CommitContext} CommitContext */
 /** @typedef {import('graph-models.js').EdgeContext} EdgeContext */
 /** @typedef {import('graph-models.js').ReferenceContext} ReferenceContext */
 
 
-adoptWebComponentStyleSheet(import.meta.url);
+document.adoptedStyleSheets.push(styleSheet);
 const [ graphTemplate, commitTemplate ] = await loadWebComponentTemplates(import.meta.url);
 
 
