@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Visual Git &ndash; Tests</title>
+    <link href="css/style.css" rel="stylesheet">
+    <link href="css/test-harness.css" rel="stylesheet">
+  </head>
+  <body>
+    <div class="tests"></div>
+    <script async src="js/ui/svg-icon.js"></script>
+    <script type="module">
+      const testsContainer = document.querySelector('.tests');
+      const testPaths = [
+        './tests/graph-tests.js',
+      ];
+      for (const testPath of testPaths) {
+        const tests = (await import(testPath)).default;
+        for (const testFunction of tests) {
+          try {
+            await testFunction();
+            console.info(`%cTest passed: ${testPath}::${testFunction.name}`, 'color: #0f0;');
+          } catch (error) {
+            console.error(`Test failed: ${testPath}::${testFunction.name}\n\n`, error);
+            testsContainer.querySelector('h2:last-of-type').classList.add('failed');
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

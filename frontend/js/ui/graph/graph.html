@@ -1,0 +1,37 @@
+<template id="graph">
+  <div class="commits"></div>
+  <div class="refs"></div>
+</template>
+<template id="commit">
+  <div class="commit" style="--transition-duration: 0s; display: none;">
+    <div class="graph">
+      <svg>
+        <defs>
+          <marker
+            class="arrow-marker"
+            viewBox="0 0 10 10"
+            refX="16"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto-start-reverse"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" />
+          </marker>
+        </defs>
+        <circle></circle>
+        <path class="edge"></path>
+        <path class="edge"></path>
+      </svg>
+    </div>
+    <div class="metadata">
+      <div class="message-container">
+        <span class="message"></span>
+      </div>
+      <div class="identifier"></div>
+      <div class="author"></div>
+      <div class="timestamp"></div>
+    </div>
+    <div class="refs"></div>
+  </div>
+</template>
